@@ -2,19 +2,12 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution":"node",
+    "moduleResolution": "bundler",
     "strict": true,
-    "preserveValueImports": false,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "allowJs": true,
-    "checkJs": true,
+    "checkJs": true
   },
-  "include": [
-    "src/**/*.d.ts",
-    "src/**/*.ts",
-    "src/**/*.js",
-    "types/*.d.ts",
-    "../../types/**/*.d.ts",
-  ]
+  "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "types/*.d.ts", "../../types/**/*.d.ts"],
+  "exclude": ["vite.config.ts", "vitest.config.ts"]
 }

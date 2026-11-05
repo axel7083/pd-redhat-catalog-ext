@@ -1,0 +1,25 @@
+{
+  "name": "@podman-desktop/extension-redhat-catalog-core-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch --mode development",
+    "test": "vitest run --coverage --passWithNoTests",
+    "test:watch": "vitest watch --coverage --passWithNoTests"
+  },
+  "devDependencies": {
+    "@podman-desktop/api": "^1.30.5",
+    "unplugin-dts": "^1.1.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.spec.*"
+  ]
+}

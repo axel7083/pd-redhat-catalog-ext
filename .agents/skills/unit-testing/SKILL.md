@@ -11,7 +11,7 @@ Use this guide when adding tests to backend, frontend, or shared packages.
 ## Commands
 
 ```sh
-npm run test:backend
-npm run test:frontend
-npm run test:shared
+pnpm test:backend
+pnpm test:frontend
+pnpm test:shared
 ```

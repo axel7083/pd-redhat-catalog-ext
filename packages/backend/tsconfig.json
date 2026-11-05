@@ -1,31 +1,24 @@
 {
   "compilerOptions": {
-    "strict":true,
+    "strict": true,
     "target": "esnext",
     "module": "esnext",
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "lib": [
-      "ES2017",
-      "webworker",
-      "dom",
-    ],
     "sourceMap": true,
     "outDir": "dist",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "types": [
-      "node",
-    ],
+    "types": ["node"],
     "paths": {
-      "/@shared/*": ["../shared/*"]
-    }
+      "/@/*": ["./src/*"]
+    },
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "include": [
-    "src",
-    "types/*.d.ts",
-    "../../types/*.d.ts",
-    "../shared/*.ts",
-    "../shared/**/*.ts"
-  ],
+  "include": ["src", "vitest.setup.*", "types/*.d.ts", "../../types/*.d.ts"],
+  "exclude": ["vite.config.ts", "vitest.config.ts"]
 }

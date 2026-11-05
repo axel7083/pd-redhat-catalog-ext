@@ -1,0 +1,40 @@
+packages:
+  - 'packages/*'
+  - 'tests/*'
+overrides:
+  minimatch@^3: ^3.1.5
+  minimatch@^9: ^9.0.9
+  minimatch@^10: ^10.2.4
+  lodash: ^4.18.1
+  rollup: ^4.59.0
+  flatted: ^3.4.2
+  ajv@^6: ^6.14.0
+  ajv@>=7: '>=8.18.0'
+  brace-expansion@^1: ^1.1.21
+  brace-expansion@^2: ^2.1.6
+  brace-expansion@^5: ^5.0.12
+  cookie: 0.7.0
+  postcss: '>=8.5.18'
+  esbuild: '>=0.28.1'
+  js-yaml@^4: ^4.3.2
+  js-yaml@^5: ^5.4.2
+  dompurify@<3.4.17: ^3.4.17
+  undici@>=7: '>=7.30.0 <8'
+  undici@^6: '>=6.29.0 <7'
+  shell-quote: ^1.12.0
+  devalue@^5: ^5.9.3
+  moment: ^2.31.0
+  browserslist: '>=4.28.7'
+  nanoid@^3: ^3.3.18
+  nanoid@^5: ^5.1.16
+  fast-uri@^3: ^3.1.6
+  fast-uri@^4: ^4.1.2
+  source-map-js@^1: ^1.2.2
+  postcss-selector-parser@^6: ^7.1.6
+  postcss-selector-parser@^7: ^7.1.6
+nodeLinker: hoisted
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - graphql@17.1.0

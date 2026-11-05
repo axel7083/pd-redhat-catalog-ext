@@ -1,157 +1,121 @@
-# Podman Desktop Extension Full Template
-
-<p align="center">
-  <img alt="Hello World" src="/images/helloselkie.png" width="50%">
-</p>
+# Podman Desktop Red Hat Catalog extension
 
 ## Overview
 
-This template provides a "full" example of creating an extension with a webview that utilizes multiple packages. Within this template, we use three separate packages to distinguish between the frontend, backend, and shared code that connects the frontend and backend.
+Browse, inspect and pull container images from the [Red Hat Ecosystem Catalog](https://catalog.redhat.com/software/containers/search) without leaving Podman Desktop: about 10,000 repositories from Red Hat and its certified partners, including the Red Hat Hardened Images.
 
-The "full" template is meant to showcase a full production example which includes multiple frontend and backend technologies such as TypeScript, Svelte and TailwindCSS.
+- **Explore**: full-text search, publisher / image type / architecture / category / product filters, sorting, pagination, deprecated toggle, and a "Hardened images first" boost.
+- **Repository details**: overview (description, documentation, categories), **Get this image** (resolved registry, tag or digest, pull command, pull into any container engine, then open or run), tags history, **Security** (health index, CVEs with advisories), **Packages** (RPM manifest) and **Containerfile**.
+- **Authenticated pulls**: images that require a Red Hat account are pulled from `registry.redhat.io`. Sign-in is delegated to the [Red Hat Authentication](https://github.com/redhat-developer/podman-desktop-redhat-account-ext) extension, which configures the registry credentials. It is a soft dependency: everything else works anonymously.
 
-All backend-related code can be separated into its own package, which improves both security and code organization.
+Browsing needs no account and no API key.
 
-The template offers flexibility in creating a Podman Desktop extension that can use the underlying Podman Desktop API and pre-built UI components via [@podman-desktop/ui-svelte](https://www.npmjs.com/package/@podman-desktop/ui-svelte).
+## How it works
 
-With this template, it's as easy as:
-* **Backend:** Write 100% TypeScript code.
-* **Frontend:** Use Svelte & pre-made UI components from Podman Desktop for rapid UI development.
+| Need | Source | Notes |
+| --- | --- | --- |
+| Search, facets, pagination | Hydra Solr `access.redhat.com/hydra/rest/search/kcs` | The search backend of catalog.redhat.com. No published schema: responses are validated with [zod](packages/backend/src/hydra/hydra-schemas.ts). |
+| Repository, images, tags, CVEs, RPMs, Containerfile | Pyxis GraphQL `catalog.redhat.com/api/containers/graphql/` | Typed with GraphQL Code Generator against a committed schema snapshot ([`pyxis/schema.graphql`](packages/backend/pyxis/schema.graphql)). |
+| Pull | the registry resolved from Pyxis | See below. |
 
-Tips for using this template:
-* Every section is heavily commented to aid understanding. Start with the `backend`, then move on to the `frontend`, and finally explore the `shared` package.
-* Adding a new function to connect the frontend and backend requires updates to both `packages/backend/src/api-impl.ts` and `packages/shared/src/HelloWorldApi.ts`.
+The search index reports `registry.access.redhat.com` even for repositories that registry refuses to serve, so the pull registry is resolved from Pyxis, with the catalog website rule ([`registry-resolver.ts`](packages/backend/src/catalog/registry-resolver.ts)):
 
-![hello world](/images/helloworld.png)
-![hello world notification](/images/helloworld_notification.png)
+```
+Red Hat repository requiring terms   → registry.redhat.io           (Red Hat account required)
+Red Hat repository without terms     → registry.access.redhat.com   (anonymous)
+partner repository                   → its registry as-is            (registry.connect.redhat.com requires credentials)
+```
 
-## Tech Stack
+Both APIs are internal to the catalog, without SLA or versioning: requests identify themselves as `podman-desktop`, are cached in memory with in-flight de-duplication, and a weekly [workflow](.github/workflows/catalog-api-drift.yaml) re-downloads the GraphQL schema and runs contract tests against the live APIs.
 
-The tech stack for this extension template includes:
-
-* TypeScript
-* Svelte 5
-* TailwindCSS
-* npm
+Red Hat Hardened Images (`registry.access.redhat.com/hi/*`) are the same images as the Hummingbird ones on `quay.io/hummingbird`: a local image from either location is shown as pulled.
 
 ## Architecture
 
-The template is organized into three packages:
+```
+packages/
+  shared/    RPC contracts (abstract API classes + CHANNEL), DTOs, pull-spec helpers
+  backend/   Inversify DI
+             ├─ HydraSearchService   query builder + zod parsing + TTL cache
+             ├─ PyxisService         typed GraphQL (generated) + TTL cache
+             ├─ CatalogService       Pyxis → DTO mapping, registry resolution
+             ├─ AuthService          redhat.authentication-provider session
+             ├─ ImageService         pull (with sign-in retry), local images
+             └─ ProviderService, WebviewService, RoutingService, DialogService
+  frontend/  SvelteKit (static) + @podman-desktop/ui-svelte
+             ├─ /                                     Explore
+             └─ /repository/[registry]/[...repository] Details, tabs in ?tab=
+```
 
-* `packages/frontend`: A Svelte/Tailwind-based frontend designed for easy integration with the Podman Desktop official [@podman-desktop/ui-svelte](https://www.npmjs.com/package/@podman-desktop/ui-svelte) package.
-* `packages/backend`: The backend code and central configuration area for the extension, managed within `package.json`.
-* `packages/shared`: Intermediary code that creates a connection between the frontend and backend via an RPC connection.
+The skeleton (RPC message proxy, Inversify services, webview) comes from the [Hummingbird extension](https://github.com/redhat-developer/podman-desktop-hummingbird-ext).
 
 ## Development
 
-To build and develop the extension, follow these steps:
+Prerequisites: Node.js 24 from [`.nvmrc`](.nvmrc) and the pinned pnpm version from [`package.json`](package.json).
 
-1. Clone the project or your fork:
-```sh
-$ git clone https://github.com/containers/podman-desktop-extension-template-webview/
-```
+1. Clone the repository and install dependencies:
 
-2. Run `npm install` to install all relevant packages:
-```sh
-$ npm install
-```
+   ```sh
+   git clone https://github.com/axel7083/pd-redhat-catalog-ext.git
+   cd pd-redhat-catalog-ext
+   nvm use
+   corepack enable
+   pnpm install --frozen-lockfile
+   ```
 
-3. Create a build:
+2. Build the extension: the shared package first, then the frontend into `packages/backend/media` and the backend into `packages/backend/dist`:
 
-Creating a build will generate all required files for Podman Desktop to load the extension:
+   ```sh
+   pnpm build
+   ```
 
-```sh
-$ npm run build
-```
+   To rebuild automatically after source changes:
 
-In the `package.json` and `vite.config.js` files, we create a directory in `/packages/backend/media` that contains all the webview components. You will see output like the following:
+   ```sh
+   pnpm watch
+   ```
 
-```sh
-$ npm run build
-...
-[0] transforming...
-[0] ✓ 140 modules transformed.
-[0] rendering chunks...
-[0] ../backend/media/index.html                           0.48 kB
-[0] ../backend/media/fa-v4compatibility-BX8XWJtE.woff2    4.80 kB
-[0] ../backend/media/fa-v4compatibility-B9MWI-E6.ttf     10.84 kB
-[0] ../backend/media/fa-regular-400-DgEfZSYE.woff2       25.46 kB
-[0] ../backend/media/fa-regular-400-Bf3rG5Nx.ttf         67.98 kB
-[0] ../backend/media/fa-brands-400-O7nZalfM.woff2       118.07 kB
-[0] ../backend/media/fa-solid-900-DOQJEhcS.woff2        157.19 kB
-[0] ../backend/media/fa-brands-400-Dur5g48u.ttf         209.38 kB
-[0] ../backend/media/fa-solid-900-BV3CbEM2.ttf          423.68 kB
-[0] ../backend/media/index-ChFLTcUn.css                 116.79 kB
-[0] ../backend/media/index-B6Ge7rjZ.js                  125.62 kB │ map: 1,670.57 kB
-[0] ✓ built in 1.49s
-[0] npm run -w packages/frontend build exited with code 0
-✨  Done in 3.02s.
-```
+3. Run the checks (they need a build first, the shared package is consumed from `dist/`):
 
-These files will be loaded from the extension.
+   ```sh
+   pnpm typecheck
+   pnpm lint:check
+   pnpm format:check
+   pnpm test            # unit tests
+   pnpm test:contract   # live tests against the catalog APIs (network)
+   ```
 
-Optionally, you can also use `npm run watch` to continuously rebuild after each change, without needing to re-run `npm build`:
+4. Load the extension in Podman Desktop. For sibling directories:
 
-```sh
-$ npm run watch
-```
+   ```sh
+   cd ../podman-desktop
+   pnpm install
+   pnpm watch --extension-folder ../pd-redhat-catalog-ext/packages/backend
+   ```
 
-4. Load the extension within Podman Desktop:
+   Run `pnpm watch` in this repository in a second terminal. **Red Hat Catalog** appears in the navigation bar.
 
-We will load the extension within Podman Desktop to test it. This requires Podman Desktop v1.17+
+### Changing a Pyxis query
 
-1. Navigate to the settings and enable `Development Mode` for the `extensions`
-1. Click on the `extensions` nav item in the left navigation bar
-1. Go to the `Local extension` tab.
-1. Click on the 'Add a local folder...' button and select the path of the `packages/backend` folder of this extension and click OK.
-1. Now the extension is part of Podman Desktop and you can see it listed in the `installed` tab of the Extensions panel.
-
-
-5. Confirm that the extension has been loaded:
-
-You will now see a "Hello World" webview in the Podman Desktop navbar. You can also check the developer console for any logging information indicating that the extension has been loaded successfully.
-
-Example of extension loading:
-
-![loaded](/images/loaded.png)
-
-## Linter, Typecheck, and Formatter
-
-We include additional tools to assist in development, which can be found in the main `package.json` file.
-
-Formatter:
-```sh
-$ npm run format:fix
-```
-
-Linter:
-```sh
-$ npm run lint:fix
-```
-
-Typechecker:
-```sh
-$ npm run typecheck
-```
-
-## Packaging and Publishing
-
-More information on how to package and publish your extension can be found in our [official publishing documentation](https://podman-desktop.io/docs/extensions/publish).
-
-However, we have provided a pre-made Containerfile in this template for you to try.
-
-1. Package your extension by building the image:
+Queries live in [`packages/backend/src/pyxis/queries.ts`](packages/backend/src/pyxis/queries.ts). After editing them, regenerate the types; codegen fails on any field or argument the schema does not have:
 
 ```sh
-$ podman build -t quay.io/myusername/myextension .
+pnpm pyxis:codegen   # regenerate src/pyxis/generated from the snapshot
+pnpm pyxis:schema    # refresh the schema snapshot from the live API
 ```
 
-2. Push the extension to an external registry:
+## Telemetry
+
+When Podman Desktop telemetry is enabled, the extension reports: searches (whether a text was entered, which facets are filtered, sort, page, number of results; never the searched text), repository views (pull registry kind, cache hit, errors), pulls (registry host, by digest, sign-in retry, cancellation, errors), sign-ins and external links opened.
+
+## Packaging and publishing
+
+The Containerfile builds the extension from source. Build a local OCI image with:
 
 ```sh
-$ podman push quay.io/myusername/myextension
+podman build -t localhost/redhat-catalog-ext:dev .
 ```
 
-3. Install via the Podman Desktop "Install Custom..." button:
+For publishing instructions, see the [Podman Desktop publishing documentation](https://podman-desktop.io/docs/extensions/publish). The manually dispatched `release` workflow accepts a semantic version and branch, then publishes the image to `ghcr.io/<owner>/<repository>:<version>`. Stable releases also receive the `latest` tag; prereleases do not.
 
-![custom install](/images/custom_install.png)
+Every push to `main` publishes `ghcr.io/<owner>/<repository>:next` (and `:<commit sha>`) through the `next-build` workflow. Install it in Podman Desktop with **Extensions > Install custom...** to try unreleased changes.

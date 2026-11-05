@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["esnext"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "declaration": true,
+    "noEmit": true,
+    "stripInternal": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "node",
+      "vitest/globals"
+    ],
+  },
+  "include": [
+    "**/vitest.config.ts",
+    "**/vite.config.ts",
+    "**/vitest.*.config.ts",
+    "packages/backend/codegen.ts",
+    "vitest.workspace.ts"
+  ]
+}

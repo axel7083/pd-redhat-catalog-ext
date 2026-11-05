@@ -1,16 +1,37 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+/**********************************************************************
+ * Copyright (C) 2026 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ ***********************************************************************/
 
-import { fixupConfigRules, fixupPluginRules } from '@eslint/compat';
-import { FlatCompat } from '@eslint/eslintrc';
-import js from '@eslint/js';
-import importPlugin from 'eslint-plugin-import';
-import noNull from 'eslint-plugin-no-null';
-import redundantUndefined from 'eslint-plugin-redundant-undefined';
-import sonarjs from 'eslint-plugin-sonarjs';
-import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
+import js from '@eslint/js';
 import typescriptLint from 'typescript-eslint';
+import tsParser from '@typescript-eslint/parser';
+import svelteParser from 'svelte-eslint-parser';
+import importPlugin from 'eslint-plugin-import';
+import { fixupConfigRules, fixupPluginRules } from '@eslint/compat';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { FlatCompat } from '@eslint/eslintrc';
+import unicorn from 'eslint-plugin-unicorn';
+import noNull from 'eslint-plugin-no-null';
+import sonarjs from 'eslint-plugin-sonarjs';
+import svelte from 'eslint-plugin-svelte';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import vitest from '@vitest/eslint-plugin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,67 +41,110 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
-export default defineConfig([
-  globalIgnores([
-    '**/node_modules/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/*.config.*js',
-    '**/__mocks__/**',
-    '**/coverage/**',
-    'packages/backend/media/**',
-    'tests/**',
-  ]),
+export default [
   {
-    files: ['**/*.{js,mjs,ts,tsx}'],
+    ignores: [
+      '*.config.*js',
+      '**/*.config.*js',
+      '**/dist/**/*',
+      '**/test-resources',
+      '**/__mocks__/',
+      '**/coverage/',
+      '**/html/',
+      'packages/backend/media/**',
+      '**/.svelte-kit/',
+      'scripts/**',
+      'packages/*/scripts/**',
+      '**/generated/',
+      '**/.svelte-kit/',
+      'tests/playwright/output/**',
+      'tests/playwright/tests/**',
+    ],
   },
   js.configs.recommended,
   ...typescriptLint.configs.recommended,
   sonarjs.configs.recommended,
-  ...fixupConfigRules(compat.extends('plugin:import/recommended', 'plugin:import/typescript')),
+  ...svelte.configs['flat/recommended'],
+  ...fixupConfigRules(
+    compat.extends('plugin:import/recommended', 'plugin:import/typescript'),
+  ),
   {
     plugins: {
+      // compliant v9 plug-ins
+      unicorn,
+      // non-compliant v9 plug-ins
       import: fixupPluginRules(importPlugin),
       'no-null': fixupPluginRules(noNull),
-      'redundant-undefined': fixupPluginRules(redundantUndefined),
+      'simple-import-sort': fixupPluginRules(simpleImportSort),
+      vitest,
     },
     settings: {
       'import/resolver': {
         typescript: true,
         node: true,
+
         'eslint-import-resolver-custom-alias': {
           alias: {
             '/@': './src',
             '/@gen': './src-generated',
           },
+
           extensions: ['.ts'],
           packages: ['packages/*'],
         },
       },
     },
+  },
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
     languageOptions: {
       globals: {
-        ...globals.es2021,
         ...globals.node,
       },
+      // parser: tsParser,
       sourceType: 'module',
       parserOptions: {
-        project: ['packages/*/tsconfig.json'],
+        extraFileExtensions: ['.svelte'],
+        warnOnUnsupportedTypeScriptVersion: false,
+        projectService: {
+          allowDefaultProject: ['types/*.d.ts'],
+        },
       },
     },
+  },
+  {
     rules: {
       eqeqeq: 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-require-imports': 'off',
+      'prefer-promise-reject-errors': 'error',
+      'comma-dangle': ['warn', 'always-multiline'],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+      '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
-      'prefer-promise-reject-errors': 'error',
       '@typescript-eslint/await-thenable': 'error',
-      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
-      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/explicit-function-return-type': 'error',
+      '@typescript-eslint/prefer-nullish-coalescing': [
+        'error',
+        {
+          ignoreConditionalTests: true,
+        },
+      ],
+      '@typescript-eslint/no-require-imports': 'off',
+
+      // unicorn custom rules
+      'unicorn/prefer-node-protocol': 'error',
+      'unicorn/no-array-sort': 'error',
+
       'no-null/no-null': 'error',
+      'sonarjs/no-empty-function': 'off',
+      'sonarjs/deprecation': 'off',
+      'sonarjs/todo-tag': 'off',
+      'sonarjs/sonar-no-fallthrough': 'off',
 
       /**
        * Having a semicolon helps the optimizer interpret your code correctly.
@@ -89,14 +153,15 @@ export default defineConfig([
        */
       semi: ['error', 'always'],
       /**
-       * This will make the history of changes in the hit a little cleaner
-       */
-      'comma-dangle': ['warn', 'always-multiline'],
-      /**
        * Just for beauty
        */
       quotes: ['error', 'single', { allowTemplateLiterals: true }],
+
+      // disabled import/namespace rule as the plug-in is not fully compatible using the compat mode
+      'import/namespace': 'off',
       'import/no-duplicates': 'error',
+      'import/first': 'error',
+      'import/newline-after-import': 'error',
       'import/no-unresolved': 'off',
       'import/default': 'off',
       'import/no-named-as-default-member': 'off',
@@ -105,23 +170,115 @@ export default defineConfig([
       'sonarjs/no-duplicate-string': 'off',
       'sonarjs/no-empty-collection': 'off',
       'sonarjs/no-small-switch': 'off',
-      'redundant-undefined/redundant-undefined': 'error',
+      'sonarjs/no-unused-expressions': 'off',
       'import/no-extraneous-dependencies': 'error',
+      'import/no-restricted-paths': [
+        'error',
+        {
+          zones: [
+            {
+              target: './packages/backend/**/*',
+              from: ['./packages/frontend/**/*'],
+            },
+            {
+              target: './packages/frontend/**/*',
+              from: ['./packages/backend/**/*'],
+            },
+          ],
+        },
+      ],
+
+      // disabled as code in this project is not yet compliant:
+      'svelte/valid-compile': 'off',
+      'no-undef': 'off',
+      'vitest/prefer-import-in-mock': 'error',
+      'vitest/consistent-test-it': [
+        'error',
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
+      'vitest/consistent-vitest-vi': [
+        'error',
+        {
+          fn: 'vi',
+        },
+      ],
+      'vitest/consistent-test-filename': [
+        'error',
+        {
+          pattern: '.*\\.spec\\.ts?$',
+        },
+      ],
+      'vitest/no-import-node-test': ['error'],
+      'vitest/prefer-hooks-on-top': ['error'],
+      'vitest/hoisted-apis-on-top': ['error'],
+      'vitest/prefer-mock-promise-shorthand': ['error'],
+      'vitest/prefer-each': ['error'],
+      'vitest/no-alias-methods': ['error'],
+      'vitest/no-conditional-in-test': ['error'],
+      'vitest/no-identical-title': ['error'],
+      'vitest/prefer-equality-matcher': ['error'],
+      'vitest/prefer-to-contain': ['error'],
+      'vitest/prefer-called-exactly-once-with': ['error'],
+      'vitest/no-duplicate-hooks': ['error'],
+      'vitest/no-conditional-expect': ['error'],
+      'vitest/consistent-each-for': [
+        'error',
+        {
+          test: 'each',
+          describe: 'each',
+        },
+      ],
+      'vitest/prefer-expect-type-of': ['error'],
+      'vitest/prefer-mock-return-shorthand': ['error'],
     },
   },
+
+  {
+    files: ['**/*.svelte', '**/*.svelte.ts'],
+
+    languageOptions: {
+      parser: svelteParser,
+      ecmaVersion: 5,
+      sourceType: 'script',
+      parserOptions: {
+        parser: tsParser,
+      },
+    },
+
+    rules: {
+      eqeqeq: 'off',
+      'no-inner-declarations': 'off',
+      'sonarjs/code-eval': 'off',
+      'sonarjs/different-types-comparison': 'off',
+      'sonarjs/prefer-nullish-coalescing': 'off',
+      'sonarjs/no-nested-template-literals': 'off',
+      'sonarjs/no-nested-conditional': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/ban-types': 'off',
+      '@typescript-eslint/no-unused-expressions': 'off',
+    },
+  },
+
   {
     files: ['packages/frontend/**'],
     languageOptions: {
       globals: {
-        ...globals.es2021,
+        ...Object.fromEntries(Object.entries(globals.node).map(([key]) => [key, 'off'])),
         ...globals.browser,
       },
     },
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'off',
-      '@typescript-eslint/no-empty-function': 'off',
-      'no-undef': 'off',
+  },
+
+  {
+    files: ['packages/shared/**'],
+    languageOptions: {
+      globals: {
+        ...Object.fromEntries(Object.entries(globals.node).map(([key]) => [key, 'off'])),
+        ...Object.fromEntries(Object.entries(globals.browser).map(([key]) => [key, 'off'])),
+      },
     },
   },
-]);
+];

@@ -1,0 +1,6 @@
+.git
+node_modules
+**/dist
+packages/backend/media
+**/coverage
+**/.svelte-kit

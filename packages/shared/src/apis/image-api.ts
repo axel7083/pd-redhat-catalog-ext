@@ -1,0 +1,49 @@
+/**********************************************************************
+ * Copyright (C) 2026 Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ ***********************************************************************/
+import type { ProviderContainerConnectionIdentifierInfo } from '../models/provider-container-connection-identifier-info';
+import type { SimpleImageInfo } from '../models/simple-image-info';
+
+export abstract class ImageApi {
+  static readonly CHANNEL: string = 'image-api';
+
+  /**
+   * Pull an image. When the registry requires Red Hat credentials and none are configured,
+   * the user is offered to sign in before retrying.
+   */
+  abstract pull(options: {
+    image: string;
+    connection: ProviderContainerConnectionIdentifierInfo;
+  }): Promise<SimpleImageInfo>;
+
+  /**
+   * List the local images whose name starts with one of the prefixes (see `localImagePrefixes`).
+   */
+  abstract all(options: {
+    connection: ProviderContainerConnectionIdentifierInfo;
+    prefixes: string[];
+  }): Promise<Array<SimpleImageInfo>>;
+
+  /**
+   * Open the image details page for the given image.
+   */
+  abstract navigateToImageDetails(image: SimpleImageInfo): Promise<void>;
+  /**
+   * Open the image run page for the given image.
+   */
+  abstract navigateToImageRun(image: SimpleImageInfo): Promise<void>;
+}
