@@ -3,7 +3,7 @@
   "repository": "https://github.com/axel7083/pd-redhat-catalog-ext",
   "displayName": "Red Hat Catalog",
   "description": "Browse, inspect and pull container images from the Red Hat Ecosystem Catalog.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "private": true,
   "engines": {
