@@ -1,16 +1,18 @@
 @import 'tailwindcss';
 @config '../tailwind.config.cjs';
 
-html, body {
-    height: 100%;
+html,
+body {
+  height: 100%;
+  /*
+     * The webview is transparent by default: paint the background so the page is consistent with the colors
+     * Podman Desktop injects, even when the webview and the main window resolve different themes.
+     */
+  background-color: var(--pd-content-bg);
+  color: var(--pd-default-text);
 }
 
 @theme {
-    --spacing-leftnavbar: 48px;
-    --spacing-leftsidebar: 170px;
-}
-
-.monaco-glyph {
-    width: 20px;
-    margin-left: 1rem;
+  --spacing-leftnavbar: 48px;
+  --spacing-leftsidebar: 170px;
 }

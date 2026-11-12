@@ -22,11 +22,18 @@ import type {
   RepositoryDetail,
   SearchQuery,
   SearchResult,
+  TagGroup,
   Vulnerability,
 } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { inject, injectable } from 'inversify';
 
-import { toContainerfile, toPackages, toRepositoryDetail, toVulnerabilities } from '/@/catalog/repository-mapper';
+import {
+  toContainerfile,
+  toPackages,
+  toRepositoryDetail,
+  toRepositoryTags,
+  toVulnerabilities,
+} from '/@/catalog/repository-mapper';
 import { TelemetryLoggerSymbol } from '/@/inject/symbol';
 import { HydraSearchService } from '/@/services/hydra-search-service';
 import { PyxisService } from '/@/services/pyxis-service';
@@ -76,6 +83,20 @@ export class CatalogService {
 
   async prefetchRepository(registry: string, repository: string): Promise<void> {
     await this.pyxis.getRepository(registry, repository);
+  }
+
+  async prefetchTabs(registry: string, repository: string, imageId: string): Promise<void> {
+    // failures are ignored: the tab fetches again, and shows the error, when opened
+    await Promise.allSettled([
+      this.pyxis.getTags(registry, repository),
+      this.pyxis.getVulnerabilities(imageId),
+      this.pyxis.getPackages(imageId),
+      this.pyxis.getFiles(imageId),
+    ]);
+  }
+
+  async getTags(registry: string, repository: string): Promise<TagGroup[]> {
+    return toRepositoryTags(repository, await this.pyxis.getTags(registry, repository));
   }
 
   async getVulnerabilities(imageId: string): Promise<Vulnerability[]> {

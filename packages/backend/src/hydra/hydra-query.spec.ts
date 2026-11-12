@@ -34,7 +34,8 @@ describe('buildHydraSearchParams', () => {
     expect(params.get('sort')).toBe('score desc,lastModifiedDate desc');
     expect(params.get('start')).toBe('0');
     expect(params.get('rows')).toBe('24');
-    expect(params.has('bq')).toBe(false);
+    // the landing page ranks Hardened images, then Red Hat repositories
+    expect(params.getAll('bq')).toEqual(['build_categories_list:Hardened^1000', 'partnerName:"Red Hat"^100']);
   });
 
   test('never requests the id facet', () => {
@@ -89,4 +90,22 @@ test('quoteSolrValue escapes quotes and backslashes', () => {
 
 test('facetFilter', () => {
   expect(facetFilter('architecture', ['amd64'])).toBe('{!tag=architecture_tag}architecture:("amd64")');
+});
+
+test.each([
+  { scope: 'all' as const, expected: [] },
+  { scope: 'redhat' as const, expected: ['partnerName:"Red Hat"'] },
+  { scope: 'hardened' as const, expected: ['build_categories_list:"Hardened"'] },
+  { scope: 'partners' as const, expected: ['-partnerName:"Red Hat"'] },
+])('scope $scope', ({ scope, expected }) => {
+  // after the 3 base filters and the deprecated filter
+  expect(buildHydraSearchParams({ scope }).getAll('fq').slice(4)).toEqual(expected);
+});
+
+test.each([
+  { name: 'search text', query: { text: 'nginx' } },
+  { name: 'another sort', query: { sort: 'title-asc' as const } },
+  { name: 'another scope', query: { scope: 'partners' as const } },
+])('no default boost with $name', ({ query }) => {
+  expect(buildHydraSearchParams(query).getAll('bq')).toEqual([]);
 });

@@ -19,6 +19,7 @@ const config = {
       '/@store/*': './src/stores/*',
     },
     output: {
+      // inline: Podman Desktop serves the webview files under a runtime URL (media/), the split chunks' root paths 404
       bundleStrategy: 'inline',
     },
     typescript: {

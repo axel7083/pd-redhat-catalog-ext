@@ -15,36 +15,30 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { Disposable, ImageInfo, ProviderContainerConnection, TelemetryLogger } from '@podman-desktop/api';
+import type { ProviderContainerConnection, TelemetryLogger } from '@podman-desktop/api';
 import {
   containerEngine as containerEngineAPI,
   navigation as navigationAPI,
   ProgressLocation,
   window as windowAPI,
 } from '@podman-desktop/api';
-import type {
-  ProviderContainerConnectionIdentifierInfo,
-  SimpleImageInfo,
-} from '@podman-desktop/extension-redhat-catalog-core-api';
-import { matchesImagePrefix, Messages } from '@podman-desktop/extension-redhat-catalog-core-api';
-import { inject, injectable, postConstruct, preDestroy } from 'inversify';
-import { z } from 'zod';
+import type { SimpleImageInfo } from '@podman-desktop/extension-redhat-catalog-core-api';
+import { inject, injectable } from 'inversify';
 
 import { REGISTRY_REDHAT_IO } from '/@/catalog/registry-resolver';
 import { TelemetryLoggerSymbol } from '/@/inject/symbol';
 import { AuthService } from '/@/services/auth-service';
+import { imageNames } from '/@/services/image-names';
+import { LocalImagesService } from '/@/services/local-images-service';
 import { ProviderService } from '/@/services/provider-service';
-import { WebviewService } from '/@/services/webview-service';
-import type { AsyncInit } from '/@/utils/async-init';
-import { Publisher } from '/@/utils/publisher';
+import { PullTracker } from '/@/services/pull-tracker';
 import { TelemetryEvents } from '/@/utils/telemetry-events';
 
-const ImageEvent = z.object({
-  Type: z.literal('image'),
-  Action: z.literal(['pull', 'delete', 'remove', 'tag', 'untag']),
-});
+export { imageNames } from '/@/services/image-names';
 
-const AUTH_ERROR = /unauthorized|authentication required|\b401\b|\b403\b|access denied|denied: /i;
+// registry.redhat.io answers anonymous pulls with a link to https://access.redhat.com/RegistryAuthentication
+const AUTH_ERROR =
+  /unauthorized|authentication required|RegistryAuthentication|\b401\b|\b403\b|access denied|denied: /i;
 
 export function isAuthenticationError(err: unknown): boolean {
   return AUTH_ERROR.test(err instanceof Error ? err.message : String(err));
@@ -52,46 +46,75 @@ export function isAuthenticationError(err: unknown): boolean {
 
 export const SIGN_IN_ACTION = 'Sign in with Red Hat';
 
+const SIGNATURE_ERROR = /signature was required|no signature exists|source image rejected/i;
+
 /**
- * Local image names of an image: its tags, and its digests for images pulled by digest.
+ * Fedora and RHEL hosts require Red Hat signatures for registry.redhat.io and registry.access.redhat.com
+ * (containers-common policy.json, sigstoreSigned). Red Hat attaches the signature shortly after publishing a
+ * build: a build pulled in the first minutes is rejected. Explain it instead of the raw policy error.
  */
-export function imageNames(image: Pick<ImageInfo, 'RepoTags' | 'RepoDigests'>): string[] {
-  return [...(image.RepoTags ?? []), ...(image.RepoDigests ?? [])];
+export function explainPullError(image: string, err: unknown): unknown {
+  const message = err instanceof Error ? err.message : String(err);
+  if (!SIGNATURE_ERROR.test(message)) return err;
+  return new Error(
+    `${image} was rejected because it is not signed yet: your container policy requires Red Hat signatures, ` +
+      'which are attached a few minutes after a build is published. Try again in a few minutes, or pull an earlier tag.',
+    { cause: err },
+  );
+}
+
+/**
+ * Node.js architecture names to OCI ones. Podman machines (macOS, Windows) run the host architecture.
+ */
+const OCI_ARCHITECTURES: Record<string, string> = { x64: 'amd64', arm64: 'arm64', ppc64: 'ppc64le', s390x: 's390x' };
+
+export function hostArchitecture(arch: string = process.arch): string {
+  return OCI_ARCHITECTURES[arch] ?? arch;
 }
 
 @injectable()
-export class ImageService extends Publisher<void> implements AsyncInit, Disposable {
-  #disposables: Disposable[] = [];
-
+export class ImageService {
   constructor(
     @inject(TelemetryLoggerSymbol)
     protected readonly telemetryLogger: TelemetryLogger,
-    @inject(WebviewService)
-    webviewService: WebviewService,
     @inject(ProviderService)
     protected readonly providers: ProviderService,
     @inject(AuthService)
     protected readonly auth: AuthService,
-  ) {
-    super(webviewService, Messages.UPDATE_IMAGES, () => {});
-  }
+    @inject(PullTracker)
+    protected readonly pulls: PullTracker,
+    @inject(LocalImagesService)
+    protected readonly localImages: LocalImagesService,
+  ) {}
 
-  public async pull(options: { image: string; connection: ProviderContainerConnection }): Promise<SimpleImageInfo> {
+  public async pull(options: {
+    image: string;
+    connection: ProviderContainerConnection;
+    architecture?: string;
+  }): Promise<SimpleImageInfo> {
     const telemetry: Record<string, unknown> = {
       registry: options.image.split('/')[0],
       byDigest: options.image.includes('@'),
+      architecture: options.architecture ?? 'default',
     };
 
+    this.pulls.start(options.image);
     try {
+      let image: SimpleImageInfo;
       try {
-        return await this.#pull(options, telemetry);
+        image = await this.#pull(options, telemetry);
       } catch (err: unknown) {
         if (!(await this.#offerSignIn(options.image, err))) throw err;
         telemetry['retriedAfterSignIn'] = true;
-        return await this.#pull(options, telemetry);
+        image = await this.#pull(options, telemetry);
       }
+      // the local images are up to date when the pull is reported done: the cards switch to Open/Run at once
+      await this.localImages.refresh();
+      this.pulls.succeed(options.image);
+      return image;
     } catch (err: unknown) {
       telemetry['error'] = String(err);
+      this.pulls.fail(options.image, err);
       throw err;
     } finally {
       this.telemetryLogger.logUsage(TelemetryEvents.PULL_IMAGE, telemetry);
@@ -128,7 +151,7 @@ export class ImageService extends Publisher<void> implements AsyncInit, Disposab
   }
 
   async #pull(
-    options: { image: string; connection: ProviderContainerConnection },
+    options: { image: string; connection: ProviderContainerConnection; architecture?: string },
     telemetry: Record<string, unknown>,
   ): Promise<SimpleImageInfo> {
     return windowAPI.withProgress(
@@ -140,7 +163,16 @@ export class ImageService extends Publisher<void> implements AsyncInit, Disposab
       async (_, token) => {
         token.onCancellationRequested(() => (telemetry['cancelled'] = true));
 
-        await containerEngineAPI.pullImage(options.connection.connection, options.image, () => {}, undefined, token);
+        try {
+          // only another architecture than the host one needs an explicit platform
+          const platform =
+            options.architecture && options.architecture !== hostArchitecture()
+              ? `linux/${options.architecture}`
+              : undefined;
+          await containerEngineAPI.pullImage(options.connection.connection, options.image, () => {}, platform, token);
+        } catch (err: unknown) {
+          throw explainPullError(options.image, err);
+        }
         const images = await containerEngineAPI.listImages({
           provider: options.connection.connection,
         });
@@ -153,32 +185,6 @@ export class ImageService extends Publisher<void> implements AsyncInit, Disposab
         };
       },
     );
-  }
-
-  public async all(options: {
-    connection: ProviderContainerConnection;
-    prefixes: string[];
-  }): Promise<SimpleImageInfo[]> {
-    const images = await containerEngineAPI.listImages({
-      provider: options.connection.connection,
-    });
-
-    const connection: ProviderContainerConnectionIdentifierInfo = {
-      providerId: options.connection.providerId,
-      name: options.connection.connection.name,
-    };
-
-    return images.reduce((accumulator, current) => {
-      const name = imageNames(current).find(name => matchesImagePrefix(name, options.prefixes));
-      if (name) {
-        accumulator.push({
-          id: current.Id,
-          name,
-          connection,
-        });
-      }
-      return accumulator;
-    }, [] as SimpleImageInfo[]);
   }
 
   async #getEngineId(image: SimpleImageInfo): Promise<string> {
@@ -196,21 +202,5 @@ export class ImageService extends Publisher<void> implements AsyncInit, Disposab
 
   public async navigateToImageRun(image: SimpleImageInfo): Promise<void> {
     return navigationAPI.navigateToImageRun(image.id, await this.#getEngineId(image), image.name);
-  }
-
-  @preDestroy()
-  override dispose(): void {
-    super.dispose();
-    this.#disposables.forEach((disposable: Disposable) => disposable.dispose());
-  }
-
-  @postConstruct()
-  async init(): Promise<void> {
-    this.#disposables.push(
-      containerEngineAPI.onEvent(event => {
-        if (!ImageEvent.safeParse(event).success) return;
-        this.notify();
-      }),
-    );
   }
 }

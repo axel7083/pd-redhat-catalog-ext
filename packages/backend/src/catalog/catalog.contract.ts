@@ -17,7 +17,7 @@
  ***********************************************************************/
 import { describe, expect, test } from 'vitest';
 
-import { toContainerfile, toPackages, toRepositoryDetail } from '/@/catalog/repository-mapper';
+import { toContainerfile, toPackages, toRepositoryDetail, toRepositoryTags } from '/@/catalog/repository-mapper';
 import { HydraSearchService } from '/@/services/hydra-search-service';
 import { PyxisService } from '/@/services/pyxis-service';
 
@@ -57,8 +57,14 @@ describe('Pyxis GraphQL', () => {
       expect.objectContaining({ registry: 'registry.redhat.io', requiresLogin: true, reason: 'redhat-terms' }),
     );
     expect(detail.latestImages.map(({ architecture }) => architecture)).toContain('amd64');
-    expect(detail.tagGroups.length).toBeGreaterThan(0);
     expect(detail.recommendedTag).not.toBe('latest');
+
+    const tags = toRepositoryTags(
+      'rhel9/postgresql-16',
+      await pyxis.getTags('registry.access.redhat.com', 'rhel9/postgresql-16'),
+    );
+    expect(tags.length).toBeGreaterThan(5);
+    expect(tags[0].architectures.length).toBeGreaterThan(1);
 
     const amd64 = detail.latestImages.find(({ architecture }) => architecture === 'amd64');
     expect(amd64?.digest).toMatch(/^sha256:/);

@@ -15,14 +15,15 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { FacetField, SearchQuery, SortKey } from '@podman-desktop/extension-redhat-catalog-core-api';
-import { FACET_FIELDS, SORT_KEYS } from '@podman-desktop/extension-redhat-catalog-core-api';
+import type { FacetField, SearchQuery, SearchScope, SortKey } from '@podman-desktop/extension-redhat-catalog-core-api';
+import { FACET_FIELDS, SEARCH_SCOPES, SORT_KEYS } from '@podman-desktop/extension-redhat-catalog-core-api';
 
 /**
  * The explore page state lives in the URL, so it survives a webview reload (see saveRouterState)
  * and the browser history works.
  *
  * - `q`: free text
+ * - `scope`: all (default), redhat, hardened, partners
  * - `f.<facet>`: selected values, repeated
  * - `sort`, `page` (1-based), `deprecated=1`, `hardened=1`
  */
@@ -35,10 +36,12 @@ export function toSearchQuery(params: URLSearchParams): SearchQuery {
     if (values.length) filters[field] = values;
   }
   const sort = params.get('sort');
+  const scope = params.get('scope');
   const page = Number.parseInt(params.get('page') ?? '1', 10);
 
   return {
     text: params.get('q') ?? undefined,
+    scope: SEARCH_SCOPES.includes(scope as SearchScope) ? (scope as SearchScope) : 'all',
     filters,
     sort: SORT_KEYS.includes(sort as SortKey) ? (sort as SortKey) : 'relevance',
     page: Number.isFinite(page) && page > 0 ? page - 1 : 0,
@@ -51,6 +54,7 @@ export function toSearchParams(query: SearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   const text = query.text?.trim();
   if (text) params.set('q', text);
+  if (query.scope && query.scope !== 'all') params.set('scope', query.scope);
   for (const field of FACET_FIELDS) {
     for (const value of query.filters?.[field] ?? []) params.append(`${FILTER_PREFIX}${field}`, value);
   }
@@ -72,6 +76,13 @@ export function toggleFilter(query: SearchQuery, field: FacetField, value: strin
   const current = query.filters?.[field] ?? [];
   const next = current.includes(value) ? current.filter(item => item !== value) : [...current, value];
   return updateQuery(query, { filters: { ...query.filters, [field]: next } });
+}
+
+/**
+ * Single-select filter (dropdowns): replace the values of a facet, or clear it with undefined.
+ */
+export function setFilter(query: SearchQuery, field: FacetField, value: string | undefined): SearchQuery {
+  return updateQuery(query, { filters: { ...query.filters, [field]: value ? [value] : [] } });
 }
 
 export function hasFilters(query: SearchQuery): boolean {

@@ -23,7 +23,9 @@ import { CatalogService } from '/@/services/catalog-service';
 import { DialogService } from '/@/services/dialog-service';
 import { HydraSearchService } from '/@/services/hydra-search-service';
 import { ImageService } from '/@/services/image-service';
+import { LocalImagesService } from '/@/services/local-images-service';
 import { ProviderService } from '/@/services/provider-service';
+import { PullTracker } from '/@/services/pull-tracker';
 import { PyxisService } from '/@/services/pyxis-service';
 import { RoutingService } from '/@/services/routing-service';
 import { WebviewService } from '/@/services/webview-service';
@@ -34,7 +36,9 @@ const module = new ContainerModule(options => {
   options.bind<DialogService>(DialogService).toSelf().inSingletonScope();
   options.bind<HydraSearchService>(HydraSearchService).toSelf().inSingletonScope();
   options.bind<ImageService>(ImageService).toSelf().inSingletonScope();
+  options.bind<LocalImagesService>(LocalImagesService).toSelf().inSingletonScope();
   options.bind<ProviderService>(ProviderService).toSelf().inSingletonScope();
+  options.bind<PullTracker>(PullTracker).toSelf().inSingletonScope();
   options.bind<PyxisService>(PyxisService).toSelf().inSingletonScope();
   options.bind<RoutingService>(RoutingService).toSelf().inSingletonScope();
   options.bind<WebviewService>(WebviewService).toSelf().inSingletonScope();
@@ -42,6 +46,8 @@ const module = new ContainerModule(options => {
   // mark it as a startup service
   options.bind(StartupSymbol).toService(DialogService);
   options.bind(StartupSymbol).toService(WebviewService);
+  // lists the local images at activation, so the first search already knows what is pulled
+  options.bind(StartupSymbol).toService(LocalImagesService);
 });
 
 export { module };

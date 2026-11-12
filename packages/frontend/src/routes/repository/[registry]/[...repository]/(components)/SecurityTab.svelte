@@ -1,11 +1,10 @@
 <script lang="ts">
-import { faShieldHalved, faWarning } from '@fortawesome/free-solid-svg-icons';
+import { faShieldHalved } from '@fortawesome/free-solid-svg-icons';
 import type { CatalogImage, Severity, Vulnerability } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { EmptyScreen } from '@podman-desktop/ui-svelte';
 
 import GradeBadge from '$lib/badges/GradeBadge.svelte';
 import SeverityBadge from '$lib/badges/SeverityBadge.svelte';
-import ListSkeleton from '$lib/skeleton/ListSkeleton.svelte';
 import { catalogAPI, dialogAPI } from '/@/api/client';
 import { formatDate } from '/@/utils/format';
 
@@ -17,9 +16,9 @@ let { image }: Props = $props();
 
 const SEVERITIES: Severity[] = ['critical', 'important', 'moderate', 'low', 'unknown'];
 
-let vulnerabilities: Promise<Vulnerability[]> = $derived(catalogAPI.getVulnerabilities(image.id));
+let items: Vulnerability[] = $derived(await catalogAPI.getVulnerabilities(image.id));
 
-function count(items: Vulnerability[], severity: Severity): number {
+function count(severity: Severity): number {
   return items.filter(item => item.severity === severity).length;
 }
 </script>
@@ -33,9 +32,7 @@ function count(items: Vulnerability[], severity: Severity): number {
     >What is this?</button>
 </div>
 
-{#await vulnerabilities}
-  <ListSkeleton />
-{:then items}
+<div class={['flex flex-col gap-y-3 transition-opacity', $effect.pending() && 'opacity-60']}>
   {#if items.length === 0}
     <EmptyScreen
       icon={faShieldHalved}
@@ -45,7 +42,7 @@ function count(items: Vulnerability[], severity: Severity): number {
   {:else}
     <div class="flex flex-row gap-x-3 text-sm text-(--pd-content-text)" aria-label="Vulnerability summary">
       {#each SEVERITIES as severity (severity)}
-        {@const value = count(items, severity)}
+        {@const value = count(severity)}
         {#if value}<span class="flex items-center gap-x-1"><SeverityBadge severity={severity} /> {value}</span>{/if}
       {/each}
     </div>
@@ -84,10 +81,4 @@ function count(items: Vulnerability[], severity: Severity): number {
       </tbody>
     </table>
   {/if}
-{:catch err}
-  <EmptyScreen
-    icon={faWarning}
-    title="Unable to fetch the vulnerabilities"
-    aria-label="Error while fetching the vulnerabilities"
-    message={err instanceof Error ? err.message : String(err)} />
-{/await}
+</div>

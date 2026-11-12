@@ -21,7 +21,12 @@
  */
 export const USER_AGENT = 'podman-desktop-redhat-catalog';
 
-export const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * Per-attempt timeout. The catalog APIs answer in ~0.3-0.9s, but Pyxis has random 8-24s outliers
+ * (see `pnpm measure`): a stalled request is abandoned and retried instead of blocking the UI.
+ */
+export const DEFAULT_TIMEOUT_MS = 10_000;
+export const DEFAULT_RETRIES = 1;
 
 export class HttpError extends Error {
   constructor(
@@ -34,11 +39,37 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * Timeouts, network failures and server errors are worth retrying; client errors are not.
+ */
+export function isRetryable(err: unknown): boolean {
+  if (err instanceof HttpError) return err.status >= 500;
+  if (err instanceof DOMException) return err.name === 'TimeoutError';
+  // fetch rejects with a TypeError on network failures
+  return err instanceof TypeError;
+}
+
+/**
+ * GET or POST (read-only GraphQL queries) a JSON document, with a timeout per attempt and retries
+ * on retryable errors. Every catalog request is a read, so retrying is safe.
+ */
 export async function fetchJson(
   url: string | URL,
   init: RequestInit = {},
-  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  options: { timeoutMs?: number; retries?: number } = {},
 ): Promise<unknown> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, retries = DEFAULT_RETRIES } = options;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetchOnce(url, init, timeoutMs);
+    } catch (err: unknown) {
+      if (attempt >= retries || !isRetryable(err)) throw err;
+      console.warn(`retrying ${String(url)} after ${String(err)}`);
+    }
+  }
+}
+
+async function fetchOnce(url: string | URL, init: RequestInit, timeoutMs: number): Promise<unknown> {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
   headers.set('user-agent', USER_AGENT);

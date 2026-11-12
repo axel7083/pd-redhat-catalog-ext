@@ -19,7 +19,8 @@
     "test:watch": "vitest watch --coverage",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "pyxis:schema": "node scripts/download-pyxis-schema.mjs",
-    "pyxis:codegen": "graphql-codegen --config codegen.ts"
+    "pyxis:codegen": "graphql-codegen --config codegen.ts",
+    "measure": "vitest run --config vitest.measure.config.ts"
   },
   "contributes": {},
   "devDependencies": {

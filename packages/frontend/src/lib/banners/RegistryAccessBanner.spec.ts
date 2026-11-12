@@ -105,5 +105,5 @@ test('partner registries point to the registry settings', () => {
     },
   });
 
-  expect(getByText(/Add them in Settings > Registries/)).toBeInTheDocument();
+  expect(getByText(/credentials in Settings > Registries/)).toBeInTheDocument();
 });

@@ -11,6 +11,10 @@ interface Props {
   name?: string;
   onchange?: (value: T | undefined) => void;
   clearable?: boolean;
+  /**
+   * Type to filter the items (long lists, e.g. tags); off for short lists (e.g. sort).
+   */
+  searchable?: boolean;
   item?: Snippet<[{ item: T }]>;
 }
 
@@ -24,6 +28,7 @@ let {
   name,
   onchange,
   clearable = true,
+  searchable = true,
 }: Props = $props();
 
 function handleOnChange(item: T): void {
@@ -48,11 +53,12 @@ function handleOnClear(): void {
   value={value}
   onclear={handleOnClear}
   onchange={handleOnChange}
+  searchable={searchable}
   --item-color="var(--pd-dropdown-item-text)"
-  --item-is-active-color="var(--pd-dropdown-item-text)"
+  --item-is-active-color="var(--pd-dropdown-item-hover-text)"
   --item-hover-color="var(--pd-dropdown-item-hover-text)"
-  --item-active-background="var(--pd-input-field-hover-stroke)"
-  --item-is-active-bg="var(--pd-input-field-hover-stroke)"
+  --item-active-background="var(--pd-dropdown-item-hover-bg)"
+  --item-is-active-bg="var(--pd-dropdown-item-hover-bg)"
   --background="var(--pd-dropdown-bg)"
   --list-background="var(--pd-dropdown-bg)"
   --item-hover-bg="var(--pd-dropdown-item-hover-bg)"

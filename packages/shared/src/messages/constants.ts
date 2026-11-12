@@ -26,11 +26,12 @@ import { AuthApi } from '../apis/auth-api';
  */
 export const noTimeoutChannels: string[] = [
   getChannel(ImageApi, 'pull'),
-  getChannel(ImageApi, 'all'),
   getChannel(AuthApi, 'signIn'),
   getChannel(CatalogApi, 'search'),
   getChannel(CatalogApi, 'getRepository'),
   getChannel(CatalogApi, 'prefetchRepository'),
+  getChannel(CatalogApi, 'getTags'),
+  getChannel(CatalogApi, 'prefetchTabs'),
   getChannel(CatalogApi, 'getVulnerabilities'),
   getChannel(CatalogApi, 'getPackages'),
   getChannel(CatalogApi, 'getContainerfile'),

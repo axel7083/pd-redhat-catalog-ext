@@ -11,7 +11,16 @@ export type RepositoryDetailQueryVariables = Exact<{
 }>;
 
 
-export type RepositoryDetailQuery = { get_repository_by_registry_path: { error: { status: number | null, detail: string | null } | null, data: { _id: string | null, registry: string | null, repository: string | null, vendor_label: string | null, requires_terms: boolean | null, eol_date: string | null, release_categories: Array<string | null> | null, build_categories: Array<string | null> | null, application_categories: Array<string | null> | null, content_stream_tags: Array<string | null> | null, replaced_by_repository_name: string | null, ui_get_this_image_override: string | null, display_data: { name: string | null, short_description: string | null, long_description: string | null, long_description_markdown: string | null } | null, documentation_links: Array<{ title: string | null, type: string | null, url: string | null } | null> | null } | null } | null, find_repository_images_by_registry_path: { total: number | null, error: { status: number | null, detail: string | null } | null, data: Array<{ _id: string | null, architecture: string | null, image_id: string | null, docker_image_digest: string | null, sum_layer_size_bytes: number | null, freshness_grades: Array<{ grade: string | null, start_date: string | null, end_date: string | null } | null> | null, parsed_data: { env_variables: Array<string | null> | null, user: string | null, ports: string | null, labels: Array<{ name: string | null, value: string | null } | null> | null } | null, repositories: Array<{ registry: string | null, repository: string | null, manifest_list_digest: string | null, manifest_schema2_digest: string | null, push_date: string | null, published: boolean | null, tags: Array<{ name: string | null, added_date: string | null } | null> | null } | null> | null } | null> | null } | null };
+export type RepositoryDetailQuery = { get_repository_by_registry_path: { error: { status: number | null, detail: string | null } | null, data: { _id: string | null, registry: string | null, repository: string | null, vendor_label: string | null, requires_terms: boolean | null, eol_date: string | null, release_categories: Array<string | null> | null, build_categories: Array<string | null> | null, application_categories: Array<string | null> | null, content_stream_tags: Array<string | null> | null, replaced_by_repository_name: string | null, ui_get_this_image_override: string | null, display_data: { name: string | null, short_description: string | null, long_description: string | null, long_description_markdown: string | null } | null, documentation_links: Array<{ title: string | null, type: string | null, url: string | null } | null> | null } | null } | null, latest_build: { data: Array<{ _id: string | null, architecture: string | null, docker_image_digest: string | null, sum_layer_size_bytes: number | null, freshness_grades: Array<{ grade: string | null, start_date: string | null, end_date: string | null } | null> | null, repositories: Array<{ repository: string | null, manifest_list_digest: string | null, manifest_schema2_digest: string | null, push_date: string | null, tags: Array<{ name: string | null } | null> | null } | null> | null } | null> | null } | null, get_repository_vendor_by_registry_path: { data: { name: string | null } | null } | null, find_repository_images_by_registry_path: { total: number | null, error: { status: number | null, detail: string | null } | null, data: Array<{ _id: string | null, architecture: string | null, docker_image_digest: string | null, sum_layer_size_bytes: number | null, freshness_grades: Array<{ grade: string | null, start_date: string | null, end_date: string | null } | null> | null, repositories: Array<{ repository: string | null, manifest_list_digest: string | null, manifest_schema2_digest: string | null, push_date: string | null, tags: Array<{ name: string | null } | null> | null } | null> | null } | null> | null } | null };
+
+export type RepositoryTagsQueryVariables = Exact<{
+  registry: string;
+  repository: string;
+  pageSize: number;
+}>;
+
+
+export type RepositoryTagsQuery = { find_repository_images_by_registry_path: { total: number | null, error: { status: number | null, detail: string | null } | null, data: Array<{ _id: string | null, architecture: string | null, docker_image_digest: string | null, freshness_grades: Array<{ grade: string | null, start_date: string | null, end_date: string | null } | null> | null, repositories: Array<{ repository: string | null, manifest_list_digest: string | null, manifest_schema2_digest: string | null, push_date: string | null, tags: Array<{ name: string | null } | null> | null } | null> | null } | null> | null } | null };
 
 export type ImageVulnerabilitiesQueryVariables = Exact<{
   id: string;
@@ -88,6 +97,41 @@ export const RepositoryDetailDocument = new TypedDocumentString(`
       ui_get_this_image_override
     }
   }
+  latest_build: find_repository_images_by_registry_path_tag(
+    registry: $registry
+    repository: $repository
+    tag: "latest"
+    page_size: $imagesPageSize
+  ) {
+    data {
+      _id
+      architecture
+      docker_image_digest
+      sum_layer_size_bytes
+      freshness_grades {
+        grade
+        start_date
+        end_date
+      }
+      repositories {
+        repository
+        manifest_list_digest
+        manifest_schema2_digest
+        push_date
+        tags {
+          name
+        }
+      }
+    }
+  }
+  get_repository_vendor_by_registry_path(
+    registry: $registry
+    repository: $repository
+  ) {
+    data {
+      name
+    }
+  }
   find_repository_images_by_registry_path(
     registry: $registry
     repository: $repository
@@ -102,7 +146,6 @@ export const RepositoryDetailDocument = new TypedDocumentString(`
     data {
       _id
       architecture
-      image_id
       docker_image_digest
       sum_layer_size_bytes
       freshness_grades {
@@ -110,31 +153,54 @@ export const RepositoryDetailDocument = new TypedDocumentString(`
         start_date
         end_date
       }
-      parsed_data {
-        labels {
-          name
-          value
-        }
-        env_variables
-        user
-        ports
-      }
       repositories {
-        registry
         repository
         manifest_list_digest
         manifest_schema2_digest
         push_date
-        published
         tags {
           name
-          added_date
         }
       }
     }
   }
 }
     `) as unknown as TypedDocumentString<RepositoryDetailQuery, RepositoryDetailQueryVariables>;
+export const RepositoryTagsDocument = new TypedDocumentString(`
+    query RepositoryTags($registry: String!, $repository: String!, $pageSize: Int!) {
+  find_repository_images_by_registry_path(
+    registry: $registry
+    repository: $repository
+    page_size: $pageSize
+    sort_by: [{ field: "repositories.push_date", order: DESC }]
+  ) {
+    total
+    error {
+      status
+      detail
+    }
+    data {
+      _id
+      architecture
+      docker_image_digest
+      freshness_grades {
+        grade
+        start_date
+        end_date
+      }
+      repositories {
+        repository
+        manifest_list_digest
+        manifest_schema2_digest
+        push_date
+        tags {
+          name
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RepositoryTagsQuery, RepositoryTagsQueryVariables>;
 export const ImageVulnerabilitiesDocument = new TypedDocumentString(`
     query ImageVulnerabilities($id: String!, $page: Int!, $pageSize: Int!) {
   find_image_vulnerabilities(id: $id, page: $page, page_size: $pageSize) {

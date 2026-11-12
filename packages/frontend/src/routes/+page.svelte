@@ -1,49 +1,30 @@
 <script lang="ts">
-import { faMagnifyingGlass, faWarning } from '@fortawesome/free-solid-svg-icons';
+import { faWarning } from '@fortawesome/free-solid-svg-icons';
 import type {
   FacetField,
   ProviderContainerConnectionDetailedInfo,
-  RepositorySummary,
   SearchQuery,
+  SearchResult,
 } from '@podman-desktop/extension-redhat-catalog-core-api';
-import {
-  FACET_FIELDS,
-  FACET_LABELS,
-  localImagePrefixes,
-  matchesImagePrefix,
-  Messages,
-  SORT_KEYS,
-  SORT_LABELS,
-} from '@podman-desktop/extension-redhat-catalog-core-api';
-import {
-  Button,
-  Checkbox,
-  Dropdown,
-  EmptyScreen,
-  LinearProgress,
-  NavPage,
-  SearchInput,
-} from '@podman-desktop/ui-svelte';
-import { onMount } from 'svelte';
+import { SCOPE_LABELS, SEARCH_SCOPES, SORT_KEYS, SORT_LABELS } from '@podman-desktop/extension-redhat-catalog-core-api';
+import { Button, EmptyScreen, NavPage, SearchInput, Tab } from '@podman-desktop/ui-svelte';
+import { untrack } from 'svelte';
 
 import { goto, invalidateAll } from '$app/navigation';
 import { resolve } from '$app/paths';
-import { navigating } from '$app/state';
-import RepositoryCard from '$lib/cards/RepositoryCard.svelte';
-import FacetPanel from '$lib/explore/FacetPanel.svelte';
-import Pagination from '$lib/explore/Pagination.svelte';
+import SearchResults from '$lib/explore/SearchResults.svelte';
+import SearchSkeleton from '$lib/explore/SearchSkeleton.svelte';
+import FilterSelect from '$lib/selects/FilterSelect.svelte';
+import Select from '$lib/selects/Select.svelte';
 import ContainerProviderConnectionSelect from '$lib/selects/ContainerProviderConnectionSelect.svelte';
-import { imageAPI, rpcBrowser } from '/@/api/client';
 import { selectedConnection } from '/@/states/connection.svelte';
 import { providerConnectionsInfo } from '/@/stores/connections';
-import { hasFilters, toggleFilter, toSearchParams, updateQuery } from '/@/utils/search-params';
+import { toSearchParams, updateQuery } from '/@/utils/search-params';
 import type { PageProps } from './$types';
 
 let { data }: PageProps = $props();
 
 let query = $derived(data.query);
-let result = $derived(data.result);
-let loading = $derived(navigating.to?.route.id === '/');
 
 // writable derived: follows the URL, and the input while typing
 let text = $derived(query.text ?? '');
@@ -52,74 +33,70 @@ let connection: ProviderContainerConnectionDetailedInfo | undefined = $derived(
   selectedConnection.resolve($providerConnectionsInfo),
 );
 
-let imagesVersion = $state(0);
-onMount(() => rpcBrowser.subscribe(Messages.UPDATE_IMAGES, () => imagesVersion++).unsubscribe);
-
-/**
- * The search index reports registry.access.redhat.com even for images pulled from registry.redhat.io.
- */
-function prefixes(repository: RepositorySummary): string[] {
-  const target = { registry: repository.registry, repository: repository.repository };
-  const all = localImagePrefixes(target);
-  if (repository.registry === 'registry.access.redhat.com') {
-    all.push(...localImagePrefixes({ ...target, registry: 'registry.redhat.io' }));
-  }
-  return all;
+function href(next: SearchQuery): string {
+  const params = toSearchParams(next).toString();
+  return `${resolve('/')}${params ? `?${params}` : ''}`;
 }
-
-/**
- * @param _version bumped on image events so the derived re-runs
- */
-function listPulled(
-  repositories: RepositorySummary[],
-  current: ProviderContainerConnectionDetailedInfo | undefined,
-  _version: number,
-): Promise<string[]> {
-  if (!current || !repositories.length) return Promise.resolve([]);
-  return imageAPI
-    .all({
-      connection: { providerId: current.providerId, name: current.name },
-      prefixes: repositories.flatMap(prefixes),
-    })
-    .then(images => images.map(({ name }) => name))
-    .catch((err: unknown) => {
-      console.error('unable to list local images', err);
-      return [];
-    });
-}
-
-let pulledNames: Promise<string[]> = $derived(listPulled(result?.repositories ?? [], connection, imagesVersion));
 
 function navigate(next: SearchQuery): Promise<void> {
-  const params = toSearchParams(next).toString();
   // eslint-disable-next-line svelte/no-navigation-without-resolve
-  return goto(`${resolve('/')}${params ? `?${params}` : ''}`, { keepFocus: true, noScroll: true });
+  return goto(href(next), { keepFocus: true, noScroll: true });
 }
 
-let debounce: ReturnType<typeof setTimeout> | undefined;
-function oninput(): void {
-  clearTimeout(debounce);
-  debounce = setTimeout(() => {
-    if (text.trim() !== (query.text ?? '').trim()) navigate(updateQuery(query, { text })).catch(console.error);
-  }, 400);
-}
+/**
+ * Search as the text changes (typing, or the clear button of the input), debounced. Reacting to the value
+ * rather than to input events also covers clearing.
+ */
+$effect(() => {
+  const value = text.trim();
+  const current = untrack(() => query);
+  if (value === (current.text ?? '').trim()) return;
+  const timer = setTimeout(() => {
+    navigate(updateQuery(current, { text: value })).catch(console.error);
+  }, 300);
+  return (): void => clearTimeout(timer);
+});
 
-function ontoggle(field: FacetField, value: string): void {
-  navigate(toggleFilter(query, field, value)).catch(console.error);
-}
+const SORT_ITEMS = SORT_KEYS.map(key => ({ value: key, label: SORT_LABELS[key] }));
 
-function clearFilters(): void {
-  navigate(updateQuery(query, { filters: {} })).catch(console.error);
+const FILTERS: Array<{ field: FacetField; label: string; width: string }> = [
+  { field: 'architecture', label: 'Architecture', width: 'w-44' },
+  { field: 'build_categories_list', label: 'Image type', width: 'w-52' },
+  { field: 'application_categories_list', label: 'Category', width: 'w-56' },
+];
+
+/**
+ * Facet values (and counts) of the latest search: the filters stay usable while a new search runs.
+ */
+let facets: SearchResult['facets'] | undefined = $state.raw(undefined);
+$effect(() => {
+  const promise = data.result;
+  promise
+    .then(result => {
+      if (promise === data.result) facets = result.facets;
+    })
+    .catch(() => {
+      // the error is shown by the results boundary
+    });
+});
+
+function onfilter(field: FacetField, values: string[]): void {
+  navigate(updateQuery(query, { filters: { ...query.filters, [field]: values } })).catch(console.error);
 }
 
 function onpage(page: number): void {
   navigate({ ...query, page })
-    .then(() => document.getElementById('results')?.scrollTo({ top: 0 }))
+    .then(() => document.getElementById('explore')?.scrollTo({ top: 0 }))
     .catch(console.error);
+}
+
+async function retry(reset: () => void): Promise<void> {
+  await invalidateAll();
+  reset();
 }
 </script>
 
-<NavPage title="Red Hat Ecosystem Catalog" searchEnabled={false}>
+<NavPage title="Red Hat Catalog" searchEnabled={false}>
   {#snippet additionalActions()}
     {#if $providerConnectionsInfo.length > 1}
       <div class="w-[250px]">
@@ -132,89 +109,70 @@ function onpage(page: number): void {
     {/if}
   {/snippet}
 
+  {#snippet tabs()}
+    {#each SEARCH_SCOPES as scope (scope)}
+      <Tab
+        title={SCOPE_LABELS[scope]}
+        url={href(updateQuery(query, { scope, filters: {} }))}
+        selected={(query.scope ?? 'all') === scope} />
+    {/each}
+  {/snippet}
+
   {#snippet content()}
-    <div class="flex flex-row w-full h-full min-h-0">
-      <!-- facets -->
-      <aside
-        class="w-64 min-w-64 flex flex-col gap-y-4 overflow-y-auto px-5 py-3 border-r border-[var(--pd-content-divider)]"
-        aria-label="Filters">
-        <div class="flex flex-col gap-y-1 text-sm text-(--pd-content-text)">
-          <Checkbox
-            checked={!!query.hardenedFirst}
-            title="Show Red Hat Hardened Images first"
-            onclick={(checked): Promise<void> => navigate(updateQuery(query, { hardenedFirst: checked }))}>
-            Hardened images first
-          </Checkbox>
-          <Checkbox
-            checked={!!query.includeDeprecated}
-            title="Include deprecated repositories"
-            onclick={(checked): Promise<void> => navigate(updateQuery(query, { includeDeprecated: checked }))}>
-            Include deprecated
-          </Checkbox>
-        </div>
-        {#if hasFilters(query)}
-          <Button type="link" aria-label="Clear filters" onclick={clearFilters}>Clear filters</Button>
-        {/if}
-        {#if result}
-          {#each FACET_FIELDS as field (field)}
-            <FacetPanel
-              label={FACET_LABELS[field]}
-              values={result.facets[field]}
-              selected={query.filters?.[field] ?? []}
-              ontoggle={(value): void => ontoggle(field, value)} />
-          {/each}
-        {/if}
-      </aside>
-
-      <!-- results -->
-      <div id="results" class="flex flex-col grow min-w-0 overflow-y-auto px-5 py-3 gap-y-3">
-        <div class="flex flex-row items-center gap-x-3">
-          <SearchInput class="grow" title="catalog" bind:searchTerm={text} oninput={oninput} />
-          <div class="w-48">
-            <Dropdown
-              ariaLabel="Sort by"
-              value={query.sort ?? 'relevance'}
-              options={SORT_KEYS.map(key => ({ value: key, label: SORT_LABELS[key] }))}
-              onChange={(sort): Promise<void> => navigate(updateQuery(query, { sort: sort as SearchQuery['sort'] }))} />
+    <div id="explore" class="flex flex-col w-full h-full min-h-0 overflow-y-auto">
+      <!-- a single bar of query controls, which never waits on the network -->
+      <div
+        class="sticky top-0 z-20 flex flex-row flex-wrap items-center gap-3 px-5 pt-4 pb-3 bg-(--pd-content-bg)"
+        aria-label="Search and filters">
+        <SearchInput class="grow min-w-64" title="Red Hat Ecosystem Catalog" bind:searchTerm={text} />
+        {#each FILTERS as filter (filter.field)}
+          <div class={filter.width}>
+            <FilterSelect
+              label={filter.label}
+              loading={!facets}
+              options={facets?.[filter.field] ?? []}
+              selected={query.filters?.[filter.field] ?? []}
+              onchange={(values): void => onfilter(filter.field, values)} />
           </div>
+        {/each}
+        <div class="w-44">
+          <Select
+            label="Sort by"
+            name="sort"
+            items={SORT_ITEMS}
+            value={SORT_ITEMS.find(item => item.value === (query.sort ?? 'relevance'))}
+            clearable={false}
+            searchable={false}
+            onchange={(item): void => {
+              if (item) navigate(updateQuery(query, { sort: item.value })).catch(console.error);
+            }} />
         </div>
+      </div>
 
-        <div class="h-1">
-          {#if loading}<LinearProgress />{/if}
-        </div>
+      <svelte:boundary>
+        <SearchResults
+          query={query}
+          result={data.result}
+          connection={connection}
+          onclear={(): Promise<void> => navigate(updateQuery(query, { filters: {} }))}
+          onpage={onpage} />
 
-        {#if data.error}
+        {#snippet pending()}
+          <SearchSkeleton />
+        {/snippet}
+
+        {#snippet failed(error, reset)}
           <EmptyScreen
             icon={faWarning}
             title="Something went wrong while searching the catalog"
             aria-label="Error while searching the catalog"
-            message={data.error}>
+            message={error instanceof Error ? error.message : String(error)}>
             <div class="flex gap-2 justify-center">
-              <Button title="Retry" type="link" onclick={invalidateAll}>Retry</Button>
+              <Button title="Retry" type="link" onclick={(): Promise<void> => retry(reset)}>Retry</Button>
             </div>
           </EmptyScreen>
-        {:else if result?.repositories.length === 0}
-          <EmptyScreen
-            icon={faMagnifyingGlass}
-            title="No repositories found"
-            aria-label="No repositories found"
-            message="Try other search terms or remove some filters." />
-        {:else if result}
-          <div
-            class={[
-              'grid min-[720px]:grid-cols-2 min-[1100px]:grid-cols-3 gap-3 transition-opacity',
-              loading && 'opacity-60',
-            ]}>
-            {#each result.repositories as repository (repository.id)}
-              {@const repositoryPrefixes = prefixes(repository)}
-              <RepositoryCard
-                object={repository}
-                pulled={pulledNames.then(names => names.some(name => matchesImagePrefix(name, repositoryPrefixes)))} />
-            {/each}
-          </div>
-          <Pagination page={result.page} pageSize={result.pageSize} total={result.total} onpage={onpage} />
-        {/if}
-      </div>
+        {/snippet}
+      </svelte:boundary>
     </div>
   {/snippet}
 </NavPage>

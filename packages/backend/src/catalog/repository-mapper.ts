@@ -32,12 +32,20 @@ import type {
   ImagePackagesQuery,
   ImageVulnerabilitiesQuery,
   RepositoryDetailQuery,
+  RepositoryTagsQuery,
 } from '/@/pyxis/generated/graphql';
 
 type PyxisRepository = NonNullable<NonNullable<RepositoryDetailQuery['get_repository_by_registry_path']>['data']>;
-type PyxisImage = NonNullable<
+type PyxisDetailImage = NonNullable<
   NonNullable<NonNullable<RepositoryDetailQuery['find_repository_images_by_registry_path']>['data']>[number]
 >;
+type PyxisTagImage = NonNullable<
+  NonNullable<NonNullable<RepositoryTagsQuery['find_repository_images_by_registry_path']>['data']>[number]
+>;
+/**
+ * The image fields shared by the detail and tags queries; the size is only fetched with the detail.
+ */
+type PyxisImage = PyxisTagImage & Partial<Pick<PyxisDetailImage, 'sum_layer_size_bytes'>>;
 type PyxisFreshnessGrade = NonNullable<NonNullable<PyxisImage['freshness_grades']>[number]>;
 type PyxisVulnerability = NonNullable<
   NonNullable<NonNullable<ImageVulnerabilitiesQuery['find_image_vulnerabilities']>['data']>[number]
@@ -86,10 +94,6 @@ function repositoryEntry(
 export function toCatalogImage(image: PyxisImage, repository: string, now?: number): CatalogImage | undefined {
   if (!image._id) return undefined;
   const entry = repositoryEntry(image, repository);
-  const labels: Record<string, string> = {};
-  for (const label of compact(image.parsed_data?.labels)) {
-    if (label.name) labels[label.name] = label.value ?? '';
-  }
 
   return {
     id: image._id,
@@ -100,9 +104,6 @@ export function toCatalogImage(image: PyxisImage, repository: string, now?: numb
     pushDate: orUndefined(entry?.push_date),
     freshnessGrade: currentGrade(compact(image.freshness_grades), now),
     sizeBytes: orUndefined(image.sum_layer_size_bytes),
-    user: orUndefined(image.parsed_data?.user),
-    env: compact(image.parsed_data?.env_variables),
-    labels,
   };
 }
 
@@ -173,6 +174,13 @@ function toDescription(repository: PyxisRepository): Pick<RepositoryDetail, 'des
   return { description: undefined, descriptionFormat: 'markdown' };
 }
 
+const ARCHITECTURE_ORDER = ['amd64', 'arm64', 'ppc64le', 's390x'];
+
+function architectureRank(architecture: string): number {
+  const rank = ARCHITECTURE_ORDER.indexOf(architecture);
+  return rank === -1 ? ARCHITECTURE_ORDER.length : rank;
+}
+
 export function toRepositoryDetail(
   registry: string,
   repositoryName: string,
@@ -190,12 +198,21 @@ export function toRepositoryDetail(
     .map(image => toCatalogImage(image, repositoryName, now))
     .filter((image): image is CatalogImage => !!image);
 
+  // Repositories can publish variants (e.g. hi/* `-builder`, `-fips`) alongside the default image: the build
+  // tagged `latest` is the default one, even when variants were pushed after it (fetched apart: it may be older
+  // than the newest images).
+  const latestBuild = compact(query.latest_build?.data)
+    .map(image => toCatalogImage(image, repositoryName, now))
+    .filter((image): image is CatalogImage => !!image);
+  const defaultBuild = latestBuild.length ? latestBuild : images;
+
   const latestImages: CatalogImage[] = [];
-  for (const image of images) {
+  for (const image of defaultBuild) {
     if (!latestImages.some(latest => latest.architecture === image.architecture)) latestImages.push(image);
   }
+  // the first image is the default one (size, health index): the most common architecture first
+  latestImages.sort((a, b) => architectureRank(a.architecture) - architectureRank(b.architecture));
 
-  const tagGroups = toTagGroups(images);
   const id = repository._id ?? '';
 
   return {
@@ -205,7 +222,7 @@ export function toRepositoryDetail(
     name: repository.display_data?.name ?? repositoryName,
     shortDescription: orUndefined(repository.display_data?.short_description),
     ...toDescription(repository),
-    publisher: orUndefined(repository.vendor_label),
+    publisher: orUndefined(query.get_repository_vendor_by_registry_path?.data?.name ?? repository.vendor_label),
     requiresTerms: !!repository.requires_terms,
     eolDate: orUndefined(repository.eol_date),
     documentationLinks: toDocumentationLinks(repository),
@@ -220,12 +237,18 @@ export function toRepositoryDetail(
       vendorLabel: repository.vendor_label,
       requiresTerms: repository.requires_terms,
     }),
-    recommendedTag: pickRecommendedTag(tagGroups[0]?.tags ?? []),
+    recommendedTag: pickRecommendedTag(toTagGroups(defaultBuild)[0]?.tags ?? []),
     latestImages,
-    tagGroups,
     totalImages: query.find_repository_images_by_registry_path?.total ?? images.length,
     catalogUrl: `${CATALOG_URL}/${repository.repository ?? repositoryName}/${id}`,
   };
+}
+
+export function toRepositoryTags(repositoryName: string, query: RepositoryTagsQuery, now?: number): TagGroup[] {
+  const images = compact(query.find_repository_images_by_registry_path?.data)
+    .map(image => toCatalogImage(image, repositoryName, now))
+    .filter((image): image is CatalogImage => !!image);
+  return toTagGroups(images);
 }
 
 const SEVERITIES: Severity[] = ['critical', 'important', 'moderate', 'low'];
@@ -270,9 +293,19 @@ export function toVulnerabilities(vulnerabilities: PyxisVulnerability[]): Vulner
   );
 }
 
+/**
+ * Some RPM manifests list the same package twice: they are de-duplicated (name, epoch, version, release, arch).
+ */
 export function toPackages(rpms: PyxisRpm[]): ImagePackage[] {
+  const seen = new Set<string>();
   return rpms
     .filter((rpm): rpm is PyxisRpm & { name: string } => !!rpm.name)
+    .filter(rpm => {
+      const key = [rpm.name, rpm.epoch, rpm.version, rpm.release, rpm.architecture].join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .map(rpm => ({
       name: rpm.name,
       version: orUndefined(rpm.version),

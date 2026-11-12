@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { PullTarget } from '../models/repository';
+import type { PullTarget, RepositoryDetail } from '../models/repository';
 
 export const HUMMINGBIRD_QUAY_PREFIX = 'quay.io/hummingbird/';
 export const HARDENED_REPOSITORY_PREFIX = 'hi/';
@@ -30,6 +30,16 @@ export function toPullSpec(
   const base = `${target.registry}/${target.repository}`;
   if (ref.digest) return `${base}@${ref.digest}`;
   return `${base}:${ref.tag ?? 'latest'}`;
+}
+
+/**
+ * Tag pulled by the quick "Pull" action of a card: `latest` when the newest build has it (a readable local
+ * image name), otherwise the recommended technical tag.
+ */
+export function quickPullTag(detail: Pick<RepositoryDetail, 'latestImages' | 'recommendedTag'>): string {
+  const tags = detail.latestImages[0]?.tags ?? [];
+  if (tags.includes('latest')) return 'latest';
+  return detail.recommendedTag ?? tags[0] ?? 'latest';
 }
 
 /**

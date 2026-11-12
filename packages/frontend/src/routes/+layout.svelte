@@ -3,19 +3,30 @@
 import '/@/app.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { onMount } from 'svelte';
-import { getRouterState, rpcBrowser } from '/@/api/client';
-import { goto } from '$app/navigation';
+import { readRouterState, rpcBrowser, saveRouterState } from '/@/api/client';
+import { afterNavigate, goto } from '$app/navigation';
 import { page } from '$app/state';
 import { Messages } from '@podman-desktop/extension-redhat-catalog-core-api';
-import Navigation from '$lib/navigations/Navigation.svelte';
+import { selectedConnection } from '/@/states/connection.svelte';
+import { appLocation } from '/@/utils/location';
 
 let { children } = $props();
 
-const state = await getRouterState();
-if (state.url !== '/' && state.url !== page.url.pathname) {
-  // eslint-disable-next-line svelte/no-navigation-without-resolve
-  goto(state.url).catch(console.error);
-}
+/**
+ * The last explore page (search, scope, filters), saved for the breadcrumb of the repository pages.
+ */
+let explore: string | undefined = $state(readRouterState().explore);
+
+afterNavigate(({ to }) => {
+  if (to?.route.id === '/') explore = appLocation(to.url);
+});
+
+/**
+ * Podman Desktop destroys the webview when the user leaves it: save where they are (restored by hooks.client.ts).
+ */
+$effect(() => {
+  saveRouterState({ url: appLocation(page.url), explore, connection: selectedConnection.key });
+});
 
 onMount(() => {
   const unsubscribe = rpcBrowser.subscribe(Messages.ROUTE_UPDATE, location => {
@@ -29,7 +40,7 @@ onMount(() => {
 });
 </script>
 
+<!-- no extension sidebar: Podman Desktop already shows its navigation, scopes are tabs of the explore page -->
 <div class="flex flex-row w-full h-full">
-  <Navigation />
   {@render children()}
 </div>

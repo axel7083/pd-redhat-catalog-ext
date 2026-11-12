@@ -56,9 +56,6 @@ export interface CatalogImage {
   pushDate?: string;
   freshnessGrade?: string;
   sizeBytes?: number;
-  user?: string;
-  env: string[];
-  labels: Record<string, string>;
 }
 
 export interface TagGroup {
@@ -104,7 +101,10 @@ export interface RepositoryDetail {
    * The most recent image per architecture.
    */
   latestImages: CatalogImage[];
-  tagGroups: TagGroup[];
+  /**
+   * Number of images published in the repository, all builds and architectures.
+   * The tag history is fetched separately, see `CatalogApi.getTags`.
+   */
   totalImages: number;
   catalogUrl: string;
 }

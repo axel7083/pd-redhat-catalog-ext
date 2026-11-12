@@ -29,7 +29,7 @@ function onclick(event: MouseEvent): void {
 <!-- link clicks bubble from the rendered anchors, which are keyboard accessible -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 <article
-  class="prose prose-sm max-w-none text-[var(--pd-content-text)] prose-headings:text-[var(--pd-content-header)] prose-a:text-[var(--pd-link)] prose-strong:text-[var(--pd-content-header)] prose-code:text-[var(--pd-content-header)] prose-pre:bg-[var(--pd-content-bg)]"
+  class="prose prose-sm max-w-none leading-6 text-[var(--pd-details-body-text)] prose-headings:text-[var(--pd-content-header)] prose-strong:text-[var(--pd-content-header)] prose-a:text-[var(--pd-link)] prose-code:text-[var(--pd-content-header)] prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[var(--pd-details-card-bg)] prose-pre:text-[var(--pd-details-body-text)] prose-blockquote:text-[var(--pd-details-body-text)] prose-blockquote:border-[var(--pd-content-divider)] prose-h1:text-2xl prose-h2:text-xl"
   onclick={onclick}>
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html html}

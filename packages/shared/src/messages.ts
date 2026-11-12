@@ -19,7 +19,8 @@
 export enum Messages {
   TEST_PURPOSE = 'test-purpose',
   UPDATE_PROVIDERS = 'update-providers',
-  UPDATE_IMAGES = 'update-images',
   UPDATE_AUTH = 'update-auth',
+  UPDATE_PULLS = 'update-pulls',
+  UPDATE_LOCAL_IMAGES = 'update-local-images',
   ROUTE_UPDATE = 'route-update',
 }

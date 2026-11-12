@@ -34,6 +34,7 @@ pnpm format:check
 pnpm format:fix
 pnpm test            # shared, backend, frontend unit tests
 pnpm test:contract   # live contract tests against the catalog APIs (network)
+pnpm measure         # cold latency of every catalog request; run it after changing a query
 pnpm pyxis:codegen   # regenerate packages/backend/src/pyxis/generated (committed)
 pnpm pyxis:schema    # refresh packages/backend/pyxis/schema.graphql from the live API
 ```
@@ -65,6 +66,7 @@ Webview (frontend) <-> shared contract <-> backend extension
 - `packages/backend/src/pyxis/queries.ts`: Pyxis GraphQL operations; `generated/` is produced by codegen and must not be edited.
 - `packages/backend/src/catalog`: Pyxis → DTO mapping and pull registry resolution.
 - `packages/backend/src/services/auth-service.ts`: Red Hat sign-in through the `redhat.authentication-provider` of the Red Hat Authentication extension (soft dependency).
+- Data loading: `+page.ts` loads return promises without awaiting them; components `await` them inside a `<svelte:boundary>` with a skeleton `pending` snippet (async Svelte, `experimental.async`). Keep heavy Pyxis data out of the repository query and load it from the tab that shows it.
 - `packages/frontend/src/routes`: `/` explore (state in the URL), `/repository/[registry]/[...repository]` details (tab in `?tab=`, architecture in `?arch=`).
 
 ## Pattern References

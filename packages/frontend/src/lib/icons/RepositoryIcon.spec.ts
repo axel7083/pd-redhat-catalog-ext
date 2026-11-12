@@ -42,8 +42,8 @@ describe('RepositoryIcon', () => {
 
     const paths = container.querySelectorAll('path');
     expect(paths).toHaveLength(2);
-    expect(paths[0]).toHaveAttribute('fill', 'var(--pd-label-primary-bg)');
-    expect(paths[1]).toHaveAttribute('fill', 'var(--pd-link)');
+    expect(paths[0]).toHaveAttribute('fill', 'var(--pd-content-header-icon)');
+    expect(paths[1]).toHaveAttribute('fill', 'var(--pd-content-header-icon)');
   });
 
   test('should render with light theme color', async () => {
@@ -55,7 +55,7 @@ describe('RepositoryIcon', () => {
 
     const paths = container.querySelectorAll('path');
     expect(paths).toHaveLength(2);
-    expect(paths[0]).toHaveAttribute('fill', 'var(--pd-label-primary-bg)');
-    expect(paths[1]).toHaveAttribute('fill', 'var(--pd-link)');
+    expect(paths[0]).toHaveAttribute('fill', 'var(--pd-content-header-icon)');
+    expect(paths[1]).toHaveAttribute('fill', 'var(--pd-content-header-icon)');
   });
 });

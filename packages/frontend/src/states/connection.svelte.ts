@@ -23,6 +23,17 @@ import type { ProviderContainerConnectionDetailedInfo } from '@podman-desktop/ex
 class SelectedConnection {
   #key: string | undefined = $state(undefined);
 
+  /**
+   * The key of the user selection (`providerId:name`), saved with the webview state.
+   */
+  get key(): string | undefined {
+    return this.#key;
+  }
+
+  set key(value: string | undefined) {
+    this.#key = value;
+  }
+
   static key(connection: ProviderContainerConnectionDetailedInfo): string {
     return `${connection.providerId}:${connection.name}`;
   }

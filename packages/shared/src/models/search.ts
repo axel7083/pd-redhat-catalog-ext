@@ -50,6 +50,29 @@ export const SORT_LABELS: Record<SortKey, string> = {
   'title-desc': 'Name (Z-A)',
 };
 
+/**
+ * Top-level scopes of the explore page, shown as tabs.
+ */
+export const SEARCH_SCOPES = ['all', 'redhat', 'hardened', 'partners'] as const;
+export type SearchScope = (typeof SEARCH_SCOPES)[number];
+
+export const SCOPE_LABELS: Record<SearchScope, string> = {
+  all: 'All',
+  redhat: 'Red Hat',
+  hardened: 'Hardened images',
+  partners: 'Partners',
+};
+
+/**
+ * Facets offered as dropdowns on the explore page; the others are too large (publisher: ~500 values,
+ * product: ~900) or redundant with a scope.
+ */
+export const FILTER_FIELDS = [
+  'architecture',
+  'build_categories_list',
+  'application_categories_list',
+] as const satisfies FacetField[];
+
 export const DEFAULT_PAGE_SIZE = 24;
 
 export interface SearchQuery {
@@ -57,6 +80,10 @@ export interface SearchQuery {
    * Free text. Empty or undefined means "everything".
    */
   text?: string;
+  /**
+   * Defaults to `all`.
+   */
+  scope?: SearchScope;
   /**
    * Selected values per facet. Values of the same facet are OR-ed, facets are AND-ed.
    */

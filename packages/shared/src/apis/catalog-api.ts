@@ -16,7 +16,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 import type { SearchQuery, SearchResult } from '../models/search';
-import type { ImageFile, ImagePackage, RepositoryDetail, Vulnerability } from '../models/repository';
+import type { ImageFile, ImagePackage, RepositoryDetail, TagGroup, Vulnerability } from '../models/repository';
 
 export abstract class CatalogApi {
   static readonly CHANNEL: string = 'catalog-api';
@@ -35,6 +35,17 @@ export abstract class CatalogApi {
    * Prefetch the details of a repository (e.g. on card hover) so the detail page opens from cache.
    */
   abstract prefetchRepository(registry: string, repository: string): Promise<void>;
+
+  /**
+   * Warm the backend cache with the data of the detail tabs (tags, and vulnerabilities, packages and
+   * Containerfile of an image), so opening a tab does not wait on the network.
+   */
+  abstract prefetchTabs(registry: string, repository: string, imageId: string): Promise<void>;
+
+  /**
+   * Recent builds of a repository, grouped by manifest list digest, newest first.
+   */
+  abstract getTags(registry: string, repository: string): Promise<TagGroup[]>;
 
   abstract getVulnerabilities(imageId: string): Promise<Vulnerability[]>;
 

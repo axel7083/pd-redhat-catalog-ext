@@ -32,8 +32,20 @@ import type { PodmanDesktopApi } from '../../../../types/podman-desktop-api';
  * This file is the client side of the API. It is used to communicate with the backend, which allows
  * cross-communication between the frontend and backend through an RPC-like communication.
  */
+/**
+ * Saved in the webview state: Podman Desktop destroys the webview when the user leaves it, this brings them back to
+ * the same place.
+ */
 export interface RouterState {
   url: string;
+  /**
+   * The explore page left (search, scope, filters): the breadcrumb of a repository goes back to it.
+   */
+  explore?: string;
+  /**
+   * The container engine selected (`providerId:name`).
+   */
+  connection?: string;
 }
 
 let api: PodmanDesktopApi;
@@ -69,15 +81,17 @@ const isRouterState = (value: unknown): value is RouterState => {
   return typeof value === 'object' && !!value && 'url' in value;
 };
 
-export async function getRouterState(): Promise<RouterState> {
-  const route: string | undefined = await routingAPI.readRoute();
-  if (route) {
-    return {
-      url: route,
-    };
-  }
-
+/**
+ * The state saved when the webview was left.
+ */
+export function readRouterState(): RouterState {
   const state = api.getState();
-  if (isRouterState(state)) return state;
-  return { url: '/' };
+  return isRouterState(state) ? state : { url: '/' };
+}
+
+export async function getRouterState(): Promise<RouterState> {
+  const saved = readRouterState();
+  // a route requested by the extension (e.g. a command) wins over the saved one
+  const route: string | undefined = await routingAPI.readRoute();
+  return route ? { ...saved, url: route } : saved;
 }

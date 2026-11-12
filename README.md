@@ -4,7 +4,7 @@
 
 Browse, inspect and pull container images from the [Red Hat Ecosystem Catalog](https://catalog.redhat.com/software/containers/search) without leaving Podman Desktop: about 10,000 repositories from Red Hat and its certified partners, including the Red Hat Hardened Images.
 
-- **Explore**: full-text search, publisher / image type / architecture / category / product filters, sorting, pagination, deprecated toggle, and a "Hardened images first" boost.
+- **Explore**: full-text search with scopes as tabs (All, Red Hat, Hardened images, Partners) and one filter bar (searchable multi-select architecture / image type / category, sort), pagination, and Pull / Open / Run from the cards. Without search text, the All scope lists Hardened images first, then Red Hat repositories.
 - **Repository details**: overview (description, documentation, categories), **Get this image** (resolved registry, tag or digest, pull command, pull into any container engine, then open or run), tags history, **Security** (health index, CVEs with advisories), **Packages** (RPM manifest) and **Containerfile**.
 - **Authenticated pulls**: images that require a Red Hat account are pulled from `registry.redhat.io`. Sign-in is delegated to the [Red Hat Authentication](https://github.com/redhat-developer/podman-desktop-redhat-account-ext) extension, which configures the registry credentials. It is a soft dependency: everything else works anonymously.
 
@@ -12,11 +12,11 @@ Browsing needs no account and no API key.
 
 ## How it works
 
-| Need | Source | Notes |
-| --- | --- | --- |
-| Search, facets, pagination | Hydra Solr `access.redhat.com/hydra/rest/search/kcs` | The search backend of catalog.redhat.com. No published schema: responses are validated with [zod](packages/backend/src/hydra/hydra-schemas.ts). |
-| Repository, images, tags, CVEs, RPMs, Containerfile | Pyxis GraphQL `catalog.redhat.com/api/containers/graphql/` | Typed with GraphQL Code Generator against a committed schema snapshot ([`pyxis/schema.graphql`](packages/backend/pyxis/schema.graphql)). |
-| Pull | the registry resolved from Pyxis | See below. |
+| Need                                                | Source                                                     | Notes                                                                                                                                           |
+| --------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search, facets, pagination                          | Hydra Solr `access.redhat.com/hydra/rest/search/kcs`       | The search backend of catalog.redhat.com. No published schema: responses are validated with [zod](packages/backend/src/hydra/hydra-schemas.ts). |
+| Repository, images, tags, CVEs, RPMs, Containerfile | Pyxis GraphQL `catalog.redhat.com/api/containers/graphql/` | Typed with GraphQL Code Generator against a committed schema snapshot ([`pyxis/schema.graphql`](packages/backend/pyxis/schema.graphql)).        |
+| Pull                                                | the registry resolved from Pyxis                           | See below.                                                                                                                                      |
 
 The search index reports `registry.access.redhat.com` even for repositories that registry refuses to serve, so the pull registry is resolved from Pyxis, with the catalog website rule ([`registry-resolver.ts`](packages/backend/src/catalog/registry-resolver.ts)):
 
@@ -83,6 +83,7 @@ Prerequisites: Node.js 24 from [`.nvmrc`](.nvmrc) and the pinned pnpm version fr
    pnpm format:check
    pnpm test            # unit tests
    pnpm test:contract   # live tests against the catalog APIs (network)
+   pnpm measure         # cold latency of every catalog request (network)
    ```
 
 4. Load the extension in Podman Desktop. For sibling directories:

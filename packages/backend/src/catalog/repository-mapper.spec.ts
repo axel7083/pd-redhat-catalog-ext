@@ -25,6 +25,7 @@ import {
   toContainerfile,
   toPackages,
   toRepositoryDetail,
+  toRepositoryTags,
   toSeverity,
   toTagGroups,
   toVulnerabilities,
@@ -39,40 +40,31 @@ function image(id: string, architecture: string, digest: string, tags: string[],
   return {
     _id: id,
     architecture,
-    image_id: null,
     docker_image_digest: null,
     sum_layer_size_bytes: 1024,
     freshness_grades: [{ grade: 'A', start_date: '2026-01-01T00:00:00Z', end_date: null }],
-    parsed_data: {
-      labels: [{ name: 'architecture', value: 'x86_64' }],
-      env_variables: ['PATH=/usr/bin'],
-      user: '1001',
-      ports: null,
-    },
     repositories: [
       {
-        registry: 'registry.redhat.io',
         repository: 'other/repository',
         manifest_list_digest: 'sha256:other',
         manifest_schema2_digest: null,
         push_date: pushDate,
-        published: true,
-        tags: [{ name: 'other', added_date: null }],
+        tags: [{ name: 'other' }],
       },
       {
-        registry: 'registry.access.redhat.com',
         repository: 'rhel9/postgresql-16',
         manifest_list_digest: digest,
         manifest_schema2_digest: 'sha256:schema2',
         push_date: pushDate,
-        published: true,
-        tags: tags.map(name => ({ name, added_date: null })),
+        tags: tags.map(name => ({ name })),
       },
     ],
   };
 }
 
 const QUERY: RepositoryDetailQuery = {
+  latest_build: null,
+  get_repository_vendor_by_registry_path: { data: { name: 'Red Hat' } },
   get_repository_by_registry_path: {
     error: null,
     data: {
@@ -125,6 +117,7 @@ describe('toRepositoryDetail', () => {
         applicationCategories: ['Database'],
         documentationLinks: [{ title: 'Docs', type: 'documentation', url: 'https://example.com' }],
         recommendedTag: '1-200',
+        publisher: 'Red Hat',
         totalImages: 600,
         catalogUrl: 'https://catalog.redhat.com/software/containers/rhel9/postgresql-16/repo-id',
       }),
@@ -137,15 +130,35 @@ describe('toRepositoryDetail', () => {
         tags: ['1-200', 'latest', '1'],
         freshnessGrade: 'A',
         sizeBytes: 1024,
-        user: '1001',
-        env: ['PATH=/usr/bin'],
-        labels: { architecture: 'x86_64' },
       }),
     );
-    expect(detail.tagGroups).toEqual([
-      expect.objectContaining({ digest: 'sha256:new', architectures: ['amd64', 'arm64'] }),
-      expect.objectContaining({ digest: 'sha256:old', tags: ['1-100'], architectures: ['amd64'] }),
-    ]);
+  });
+
+  test('the amd64 image comes first, whatever the push order', () => {
+    const query = structuredClone(QUERY);
+    query.find_repository_images_by_registry_path!.data!.reverse();
+
+    const detail = toRepositoryDetail('registry.access.redhat.com', 'rhel9/postgresql-16', query);
+    expect(detail.latestImages.map(({ architecture }) => architecture)).toEqual(['amd64', 'arm64']);
+  });
+
+  test('the build tagged latest is the default one, even when variants were pushed after it', () => {
+    const query = structuredClone(QUERY);
+    query.find_repository_images_by_registry_path!.data = [
+      image('builder-amd64', 'amd64', 'sha256:builder', ['1-builder', '1-builder-300'], '2026-11-03T00:00:00Z'),
+    ];
+    query.latest_build = {
+      data: [image('latest-amd64', 'amd64', 'sha256:latest', ['1', '1-200', 'latest'], '2026-11-02T00:00:00Z')],
+    };
+
+    const detail = toRepositoryDetail('registry.access.redhat.com', 'rhel9/postgresql-16', query);
+    expect(detail.latestImages.map(({ id }) => id)).toEqual(['latest-amd64']);
+    expect(detail.recommendedTag).toBe('1-200');
+  });
+
+  test('without a latest tag, the newest images are the default build', () => {
+    const detail = toRepositoryDetail('registry.access.redhat.com', 'rhel9/postgresql-16', QUERY);
+    expect(detail.latestImages.map(({ id }) => id)).toEqual(['new-amd64', 'new-arm64']);
   });
 
   test('ignores the "<p>None</p>" HTML description', () => {
@@ -160,16 +173,27 @@ describe('toRepositoryDetail', () => {
     expect(() =>
       toRepositoryDetail('quay.io', 'nope', {
         get_repository_by_registry_path: { error: { status: 404, detail: 'not found' }, data: null },
+        get_repository_vendor_by_registry_path: null,
+        latest_build: null,
         find_repository_images_by_registry_path: null,
       }),
     ).toThrow('Repository quay.io/nope not found: not found');
   });
 });
 
+test('toRepositoryTags groups the images of a build', () => {
+  expect(
+    toRepositoryTags('rhel9/postgresql-16', {
+      find_repository_images_by_registry_path: QUERY.find_repository_images_by_registry_path,
+    }),
+  ).toEqual([
+    expect.objectContaining({ digest: 'sha256:new', architectures: ['amd64', 'arm64'] }),
+    expect.objectContaining({ digest: 'sha256:old', tags: ['1-100'], architectures: ['amd64'] }),
+  ]);
+});
+
 test('toTagGroups drops groups without tags', () => {
-  expect(toTagGroups([{ id: 'a', architecture: 'amd64', digest: 'sha256:a', tags: [], env: [], labels: {} }])).toEqual(
-    [],
-  );
+  expect(toTagGroups([{ id: 'a', architecture: 'amd64', digest: 'sha256:a', tags: [] }])).toEqual([]);
 });
 
 test.each([
@@ -237,6 +261,11 @@ test('toVulnerabilities merges duplicated CVEs and sorts by severity', () => {
       affectedPackages: ['curl-1', 'libcurl-1'],
     }),
   ]);
+});
+
+test('toPackages drops duplicated entries', () => {
+  const rpm = { name: 'bash', version: '5', release: '1', epoch: null, architecture: 'x86_64', summary: 'shell' };
+  expect(toPackages([rpm, { ...rpm }, { ...rpm, architecture: 'noarch' }])).toHaveLength(2);
 });
 
 test('toPackages sorts by name and drops unnamed packages', () => {

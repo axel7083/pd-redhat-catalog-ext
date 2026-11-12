@@ -44,7 +44,7 @@ test('execute posts the query to the GraphQL endpoint with a trailing slash', as
   expect(body.variables).toEqual({
     registry: 'registry.access.redhat.com',
     repository: 'ubi9/ubi',
-    imagesPageSize: 100,
+    imagesPageSize: 8,
   });
 });
 

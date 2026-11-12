@@ -1,5 +1,5 @@
-const tailwindColors = require('tailwindcss/colors')
-const tailwindTypography = require('@tailwindcss/typography')
+const tailwindColors = require('tailwindcss/colors');
+const tailwindTypography = require('@tailwindcss/typography');
 
 module.exports = {
   content: [

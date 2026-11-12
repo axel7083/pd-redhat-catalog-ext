@@ -17,7 +17,7 @@
  ***********************************************************************/
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { RpcBrowser, RpcExtension } from './message-proxy';
+import { RpcBrowser, RpcExtension, toPlainData } from './message-proxy';
 import { getChannel } from './utils';
 import type { Webview } from '@podman-desktop/api';
 import * as messageConstants from './constants';
@@ -354,4 +354,27 @@ describe('no timeout channel', () => {
     expect(error).toBeUndefined();
     expect(result).toBe('pong');
   });
+});
+
+test('arguments are copied to plain data before being posted', async () => {
+  const posted: unknown[] = [];
+  const recordingApi = {
+    postMessage: (message: unknown): void => {
+      posted.push(message);
+    },
+  } as unknown as PodmanDesktopApi;
+  const rpcBrowser = new RpcBrowser(window, recordingApi);
+  // a Proxy, like the Svelte state values, cannot be cloned by postMessage
+  const argument = new Proxy({ id: 'image', connection: { name: 'podman' } }, {});
+
+  rpcBrowser.invoke('channel', argument).catch(() => {});
+
+  const [message] = posted as Array<{ args: unknown[] }>;
+  expect(message.args).toEqual([{ id: 'image', connection: { name: 'podman' } }]);
+  expect(structuredClone(message.args)).toEqual(message.args);
+});
+
+test('toPlainData keeps undefined', () => {
+  expect(toPlainData(undefined)).toBeUndefined();
+  expect(toPlainData({ a: 1, b: undefined })).toEqual({ a: 1 });
 });

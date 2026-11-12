@@ -33,11 +33,15 @@ export * from './messages/message-proxy';
 // models
 export * from './models/auth-status';
 export * from './models/input-box-options';
+export * from './models/local-image';
 export * from './models/provider-container-connection-identifier-info';
 export * from './models/provider-container-connection-detailed-info';
+export * from './models/pull-status';
 export * from './models/repository';
 export * from './models/search';
 export * from './models/simple-image-info';
 
 // utils
+export * from './utils/local-images';
 export * from './utils/pull-spec';
+export * from './utils/tags';

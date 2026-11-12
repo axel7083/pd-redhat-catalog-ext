@@ -25,6 +25,7 @@
     "test:frontend": "pnpm --dir packages/frontend test",
     "test:shared": "vitest run --project @podman-desktop/extension-redhat-catalog-core-api",
     "test:contract": "pnpm --dir packages/backend test:contract",
+    "measure": "pnpm --dir packages/backend measure",
     "test": "pnpm test:shared && pnpm test:backend && pnpm test:frontend",
     "typecheck:shared": "tsc --noEmit --project packages/shared",
     "typecheck:frontend": "pnpm --dir packages/frontend check",

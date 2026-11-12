@@ -17,12 +17,20 @@
  ***********************************************************************/
 import { describe, expect, test } from 'vitest';
 
-import { hasFilters, toggleFilter, toSearchParams, toSearchQuery, updateQuery } from '/@/utils/search-params';
+import {
+  hasFilters,
+  setFilter,
+  toggleFilter,
+  toSearchParams,
+  toSearchQuery,
+  updateQuery,
+} from '/@/utils/search-params';
 
 describe('search params', () => {
   test('round trip', () => {
     const query = {
       text: 'postgresql',
+      scope: 'partners' as const,
       filters: { partnerName: ['Red Hat', 'Acme'], architecture: ['arm64'] },
       sort: 'title-asc' as const,
       page: 2,
@@ -64,4 +72,17 @@ test('toggleFilter adds then removes a value', () => {
   const removed = toggleFilter(added, 'architecture', 'amd64');
   expect(removed.filters?.architecture).toEqual([]);
   expect(hasFilters(removed)).toBe(false);
+});
+
+test('setFilter replaces or clears a single-select filter', () => {
+  const set = setFilter({ page: 2, filters: { architecture: ['amd64'] } }, 'architecture', 'arm64');
+  expect(set.filters?.architecture).toEqual(['arm64']);
+  expect(set.page).toBe(0);
+  expect(setFilter(set, 'architecture', undefined).filters?.architecture).toEqual([]);
+});
+
+test('scope defaults to all and is omitted from the URL', () => {
+  expect(toSearchQuery(new URLSearchParams('scope=unknown')).scope).toBe('all');
+  expect(toSearchParams({ scope: 'all' }).has('scope')).toBe(false);
+  expect(toSearchParams({ scope: 'hardened' }).get('scope')).toBe('hardened');
 });

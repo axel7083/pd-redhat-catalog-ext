@@ -16,14 +16,18 @@
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
 import type {
+  LocalImages,
   ProviderContainerConnectionIdentifierInfo,
+  PullStatus,
   SimpleImageInfo,
 } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { ImageApi } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { inject, injectable } from 'inversify';
 
-import { ImageService } from '/@/services/image-service';
+import { hostArchitecture, ImageService } from '/@/services/image-service';
 import { ProviderService } from '/@/services/provider-service';
+import { LocalImagesService } from '/@/services/local-images-service';
+import { PullTracker } from '/@/services/pull-tracker';
 
 @injectable()
 export class ImageApiImpl extends ImageApi {
@@ -32,6 +36,10 @@ export class ImageApiImpl extends ImageApi {
     protected readonly providers: ProviderService,
     @inject(ImageService)
     protected readonly images: ImageService,
+    @inject(PullTracker)
+    protected readonly pulls: PullTracker,
+    @inject(LocalImagesService)
+    protected readonly localImages: LocalImagesService,
   ) {
     super();
   }
@@ -39,23 +47,30 @@ export class ImageApiImpl extends ImageApi {
   override pull(options: {
     image: string;
     connection: ProviderContainerConnectionIdentifierInfo;
+    architecture?: string;
   }): Promise<SimpleImageInfo> {
     const connection = this.providers.getProviderContainerConnection(options.connection);
     return this.images.pull({
       image: options.image,
       connection,
+      architecture: options.architecture,
     });
   }
 
-  override all(options: {
-    connection: ProviderContainerConnectionIdentifierInfo;
-    prefixes: string[];
-  }): Promise<Array<SimpleImageInfo>> {
-    const connection = this.providers.getProviderContainerConnection(options.connection);
-    return this.images.all({
-      prefixes: options.prefixes,
-      connection,
-    });
+  override async getHostArchitecture(): Promise<string> {
+    return hostArchitecture();
+  }
+
+  override async getPulls(): Promise<PullStatus[]> {
+    return this.pulls.all();
+  }
+
+  override async dismissPull(image: string): Promise<void> {
+    this.pulls.dismiss(image);
+  }
+
+  override async getLocalImages(): Promise<LocalImages> {
+    return this.localImages.snapshot();
   }
 
   override navigateToImageDetails(image: SimpleImageInfo): Promise<void> {

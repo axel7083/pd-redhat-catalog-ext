@@ -65,9 +65,7 @@ export default [
   ...typescriptLint.configs.recommended,
   sonarjs.configs.recommended,
   ...svelte.configs['flat/recommended'],
-  ...fixupConfigRules(
-    compat.extends('plugin:import/recommended', 'plugin:import/typescript'),
-  ),
+  ...fixupConfigRules(compat.extends('plugin:import/recommended', 'plugin:import/typescript')),
   {
     plugins: {
       // compliant v9 plug-ins

@@ -45,6 +45,13 @@ export interface ISubscribedMessage {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type UnaryRPC = (...args: any[]) => Promise<unknown>;
 
+/**
+ * Deep copy to plain data (drops proxies, functions and undefined object properties).
+ */
+export function toPlainData<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
 export function isMessageRequest(content: unknown): content is IMessageRequest {
   return !!content && typeof content === 'object' && 'id' in content && 'channel' in content;
 }
@@ -201,11 +208,12 @@ export class RpcBrowser {
       this.promises.set(requestId, { resolve, reject });
     });
 
-    // Post the message
+    // Post the message. The arguments are copied to plain data: values coming from Svelte state are proxies,
+    // which postMessage cannot clone ("An object could not be cloned"). RPC arguments are JSON data.
     this.api.postMessage({
       id: requestId,
       channel: channel,
-      args: args,
+      args: toPlainData(args),
     } as IMessageRequest);
 
     // Add some timeout

@@ -10,10 +10,7 @@
     "stripInternal": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": [
-      "node",
-      "vitest/globals"
-    ],
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "**/vitest.config.ts",

@@ -21,6 +21,7 @@ import type {
   RepositoryDetail,
   SearchQuery,
   SearchResult,
+  TagGroup,
   Vulnerability,
 } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { CatalogApi } from '@podman-desktop/extension-redhat-catalog-core-api';
@@ -47,6 +48,14 @@ export class CatalogApiImpl extends CatalogApi {
 
   override prefetchRepository(registry: string, repository: string): Promise<void> {
     return this.catalog.prefetchRepository(registry, repository);
+  }
+
+  override prefetchTabs(registry: string, repository: string, imageId: string): Promise<void> {
+    return this.catalog.prefetchTabs(registry, repository, imageId);
+  }
+
+  override getTags(registry: string, repository: string): Promise<TagGroup[]> {
+    return this.catalog.getTags(registry, repository);
   }
 
   override getVulnerabilities(imageId: string): Promise<Vulnerability[]> {

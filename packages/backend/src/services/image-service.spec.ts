@@ -26,11 +26,18 @@ import { containerEngine, window } from '@podman-desktop/api';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { AuthService } from '/@/services/auth-service';
-import { imageNames, ImageService, isAuthenticationError, SIGN_IN_ACTION } from '/@/services/image-service';
+import {
+  explainPullError,
+  hostArchitecture,
+  imageNames,
+  ImageService,
+  isAuthenticationError,
+  SIGN_IN_ACTION,
+} from '/@/services/image-service';
 import type { ProviderService } from '/@/services/provider-service';
-import type { WebviewService } from '/@/services/webview-service';
+import type { LocalImagesService } from '/@/services/local-images-service';
+import type { PullTracker } from '/@/services/pull-tracker';
 
-const WEBVIEW_SERVICE_MOCK = { getPanel: vi.fn() } as unknown as WebviewService;
 const TELEMETRY_LOGGER_MOCK = { logUsage: vi.fn() } as unknown as TelemetryLogger;
 const PROVIDER_SERVICE_MOCK = {
   toProviderContainerConnectionDetailedInfo: vi.fn(),
@@ -40,6 +47,14 @@ const AUTH_SERVICE_MOCK = {
   signIn: vi.fn(),
   installAuthenticationExtension: vi.fn(),
 } as unknown as AuthService;
+
+const LOCAL_IMAGES_MOCK = { refresh: vi.fn() } as unknown as LocalImagesService;
+
+const PULL_TRACKER_MOCK = {
+  start: vi.fn(),
+  succeed: vi.fn(),
+  fail: vi.fn(),
+} as unknown as PullTracker;
 
 const CONNECTION = {
   providerId: 'podman',
@@ -64,7 +79,13 @@ beforeEach(() => {
 });
 
 function getImageService(): ImageService {
-  return new ImageService(TELEMETRY_LOGGER_MOCK, WEBVIEW_SERVICE_MOCK, PROVIDER_SERVICE_MOCK, AUTH_SERVICE_MOCK);
+  return new ImageService(
+    TELEMETRY_LOGGER_MOCK,
+    PROVIDER_SERVICE_MOCK,
+    AUTH_SERVICE_MOCK,
+    PULL_TRACKER_MOCK,
+    LOCAL_IMAGES_MOCK,
+  );
 }
 
 describe('pull', () => {
@@ -73,6 +94,12 @@ describe('pull', () => {
 
     expect(containerEngine.pullImage).toHaveBeenCalledOnce();
     expect(image).toEqual(expect.objectContaining({ id: 'sha256:1', name: IMAGE }));
+    expect(PULL_TRACKER_MOCK.start).toHaveBeenCalledWith(IMAGE);
+    // the local images are refreshed before the pull is reported done
+    expect(LOCAL_IMAGES_MOCK.refresh).toHaveBeenCalledOnce();
+    expect(vi.mocked(LOCAL_IMAGES_MOCK.refresh).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(PULL_TRACKER_MOCK.succeed).mock.invocationCallOrder[0],
+    );
   });
 
   test('offers to sign in on an authentication error and retries', async () => {
@@ -94,6 +121,7 @@ describe('pull', () => {
 
     await expect(getImageService().pull({ image: IMAGE, connection: CONNECTION })).rejects.toThrow('unauthorized');
     expect(AUTH_SERVICE_MOCK.signIn).not.toHaveBeenCalled();
+    expect(PULL_TRACKER_MOCK.fail).toHaveBeenCalledWith(IMAGE, expect.any(Error));
   });
 
   test('offers to install the authentication extension when missing', async () => {
@@ -124,25 +152,14 @@ describe('pull', () => {
   });
 });
 
-test('all lists local images matching the prefixes', async () => {
-  vi.mocked(containerEngine.listImages).mockResolvedValue([
-    { Id: '1', RepoTags: ['quay.io/hummingbird/nginx:latest'] },
-    { Id: '2', RepoTags: ['registry.access.redhat.com/hi/nginx-other:latest'] },
-    { Id: '3', RepoTags: ['registry.access.redhat.com/hi/nginx:1'] },
-  ] as unknown as ImageInfo[]);
-
-  const images = await getImageService().all({
-    connection: CONNECTION,
-    prefixes: ['registry.access.redhat.com/hi/nginx', 'quay.io/hummingbird/nginx'],
-  });
-
-  expect(images.map(({ id }) => id)).toEqual(['1', '3']);
-});
-
 test.each([
   { message: 'unauthorized: authentication required', expected: true },
   { message: 'Error: 401 Unauthorized', expected: true },
   { message: 'denied: requested access to the resource is denied', expected: true },
+  {
+    message: 'unable to pull image "registry.redhat.io/a/b:1": https://access.redhat.com/RegistryAuthentication',
+    expected: true,
+  },
   { message: 'manifest unknown', expected: false },
 ])('isAuthenticationError($message)', ({ message, expected }) => {
   expect(isAuthenticationError(new Error(message))).toBe(expected);
@@ -151,4 +168,40 @@ test.each([
 test('imageNames', () => {
   expect(imageNames({ RepoTags: ['a:1'], RepoDigests: ['a@sha256:1'] })).toEqual(['a:1', 'a@sha256:1']);
   expect(imageNames({ RepoTags: undefined, RepoDigests: undefined } as unknown as ImageInfo)).toEqual([]);
+});
+
+test('a missing signature is explained', async () => {
+  vi.mocked(containerEngine.pullImage).mockRejectedValue(
+    new Error('unable to pull image: Source image rejected: A signature was required, but no signature exists'),
+  );
+
+  await expect(getImageService().pull({ image: IMAGE, connection: CONNECTION })).rejects.toThrow(
+    `${IMAGE} was rejected because it is not signed yet`,
+  );
+  // not an authentication problem: no sign-in offered
+  expect(window.showWarningMessage).not.toHaveBeenCalled();
+});
+
+test('explainPullError keeps other errors', () => {
+  const err = new Error('manifest unknown');
+  expect(explainPullError(IMAGE, err)).toBe(err);
+});
+
+test.each([
+  { arch: 'x64', expected: 'amd64' },
+  { arch: 'arm64', expected: 'arm64' },
+  { arch: 'ppc64', expected: 'ppc64le' },
+  { arch: 's390x', expected: 's390x' },
+])('hostArchitecture($arch) → $expected', ({ arch, expected }) => {
+  expect(hostArchitecture(arch)).toBe(expected);
+});
+
+test('another architecture is pulled with an explicit platform, the host one without', async () => {
+  const other = hostArchitecture() === 'arm64' ? 'amd64' : 'arm64';
+
+  await getImageService().pull({ image: IMAGE, connection: CONNECTION, architecture: other });
+  expect(vi.mocked(containerEngine.pullImage).mock.calls[0][3]).toBe(`linux/${other}`);
+
+  await getImageService().pull({ image: IMAGE, connection: CONNECTION, architecture: hostArchitecture() });
+  expect(vi.mocked(containerEngine.pullImage).mock.calls[1][3]).toBeUndefined();
 });

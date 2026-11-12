@@ -17,7 +17,7 @@
  ***********************************************************************/
 import { expect, test } from 'vitest';
 
-import { localImagePrefixes, matchesImagePrefix, toPullSpec } from './pull-spec';
+import { localImagePrefixes, matchesImagePrefix, quickPullTag, toPullSpec } from './pull-spec';
 
 const TARGET = { registry: 'registry.access.redhat.com', repository: 'hi/nginx' };
 
@@ -41,4 +41,13 @@ test('matchesImagePrefix requires a tag or digest separator', () => {
   expect(matchesImagePrefix('quay.io/hummingbird/nginx:latest', prefixes)).toBe(true);
   expect(matchesImagePrefix('registry.access.redhat.com/hi/nginx@sha256:abc', prefixes)).toBe(true);
   expect(matchesImagePrefix('registry.access.redhat.com/hi/nginx-unprivileged:latest', prefixes)).toBe(false);
+});
+
+test('quickPullTag prefers latest, then the recommended tag', () => {
+  const image = { id: 'a', architecture: 'amd64' };
+  expect(quickPullTag({ latestImages: [{ ...image, tags: ['1-2', 'latest'] }], recommendedTag: '1-2' })).toBe('latest');
+  expect(quickPullTag({ latestImages: [{ ...image, tags: ['v4.22-62', 'v4.22'] }], recommendedTag: 'v4.22-62' })).toBe(
+    'v4.22-62',
+  );
+  expect(quickPullTag({ latestImages: [], recommendedTag: undefined })).toBe('latest');
 });

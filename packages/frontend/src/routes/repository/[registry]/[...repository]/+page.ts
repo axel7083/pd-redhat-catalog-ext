@@ -18,26 +18,22 @@
 import type { RepositoryDetail } from '@podman-desktop/extension-redhat-catalog-core-api';
 
 import { catalogAPI } from '/@/api/client';
-import type { DetailTab } from './(components)/tabs';
-import { TABS } from './(components)/tabs';
 import type { PageLoad } from './$types';
 
 interface Data {
   registry: string;
   repository: string;
-  tab: DetailTab;
-  architecture?: string;
+  /**
+   * Not awaited: the page renders at once and the content awaits it in a boundary.
+   */
   detail: Promise<RepositoryDetail>;
 }
 
-export const load: PageLoad = async ({ params, url }): Promise<Data> => {
-  const tab = url.searchParams.get('tab');
-  return {
-    registry: params.registry,
-    repository: params.repository,
-    tab: TABS.includes(tab as DetailTab) ? (tab as DetailTab) : 'overview',
-    architecture: url.searchParams.get('arch') ?? undefined,
-    // not awaited: the page shows a skeleton while Pyxis answers (~2s, cached afterwards)
-    detail: catalogAPI.getRepository(params.registry, params.repository),
-  };
-};
+/**
+ * Only depends on the route params: switching tab (`?tab=`) or architecture (`?arch=`) does not reload.
+ */
+export const load: PageLoad = ({ params }): Data => ({
+  registry: params.registry,
+  repository: params.repository,
+  detail: catalogAPI.getRepository(params.registry, params.repository),
+});

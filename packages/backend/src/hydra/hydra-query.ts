@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { FacetField, SearchQuery, SortKey } from '@podman-desktop/extension-redhat-catalog-core-api';
+import type { FacetField, SearchQuery, SearchScope, SortKey } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { DEFAULT_PAGE_SIZE, FACET_FIELDS } from '@podman-desktop/extension-redhat-catalog-core-api';
 
 export const HYDRA_SEARCH_URL = 'https://access.redhat.com/hydra/rest/search/kcs';
@@ -61,6 +61,14 @@ const SORTS: Record<SortKey, string> = {
 };
 
 const HARDENED_BOOST = 'build_categories_list:Hardened^1000';
+const REDHAT_BOOST = 'partnerName:"Red Hat"^100';
+
+const SCOPE_FILTERS: Record<SearchScope, string | undefined> = {
+  all: undefined,
+  redhat: 'partnerName:"Red Hat"',
+  hardened: 'build_categories_list:"Hardened"',
+  partners: '-partnerName:"Red Hat"',
+};
 
 /**
  * Quote a value for a Solr field query.
@@ -87,6 +95,17 @@ export function normalizePage(query: SearchQuery): { page: number; pageSize: num
   return { page, pageSize };
 }
 
+/**
+ * Ranking boosts (bq). Without search text, "relevance" alone means "most recently modified", which surfaces
+ * whatever partner pushed last (often re-uploads of Red Hat images). The default landing of the All scope
+ * ranks Hardened images, then Red Hat repositories, then the rest; nothing is filtered out.
+ */
+export function boosts(query: SearchQuery, hasText: boolean): string[] {
+  const relevance = (query.sort ?? 'relevance') === 'relevance';
+  if (relevance && !hasText && (query.scope ?? 'all') === 'all') return [HARDENED_BOOST, REDHAT_BOOST];
+  return query.hardenedFirst ? [HARDENED_BOOST] : [];
+}
+
 export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {
   const params = new URLSearchParams();
   const { page, pageSize } = normalizePage(query);
@@ -100,6 +119,9 @@ export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {
     params.append('fq', '-release_categories:"Deprecated"');
   }
 
+  const scope = SCOPE_FILTERS[query.scope ?? 'all'];
+  if (scope) params.append('fq', scope);
+
   for (const field of FACET_FIELDS) {
     const values = query.filters?.[field]?.filter(value => value.length > 0);
     if (values?.length) params.append('fq', facetFilter(field, values));
@@ -112,8 +134,8 @@ export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {
   params.set('start', String(page * pageSize));
   params.set('rows', String(pageSize));
   params.set('sort', SORTS[query.sort ?? 'relevance']);
-  if (query.hardenedFirst) {
-    params.set('bq', HARDENED_BOOST);
+  for (const boost of boosts(query, !!text)) {
+    params.append('bq', boost);
   }
   params.set('fl', HYDRA_FIELDS.join(','));
 

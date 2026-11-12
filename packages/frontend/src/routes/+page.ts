@@ -23,19 +23,14 @@ import type { PageLoad } from './$types';
 
 interface Data {
   query: SearchQuery;
-  result?: SearchResult;
-  error?: string;
+  /**
+   * Not awaited: the navigation completes immediately (search box, filters and URL update at once) and the
+   * results render through `await` in a boundary, see SearchResults.svelte.
+   */
+  result: Promise<SearchResult>;
 }
 
-/**
- * The search is awaited: during a new search SvelteKit keeps the current results on screen
- * (see `navigating` in +page.svelte) instead of flashing a skeleton for every keystroke.
- */
-export const load: PageLoad = async ({ url }): Promise<Data> => {
+export const load: PageLoad = ({ url }): Data => {
   const query = toSearchQuery(url.searchParams);
-  try {
-    return { query, result: await catalogAPI.search(query) };
-  } catch (err: unknown) {
-    return { query, error: err instanceof Error ? err.message : String(err) };
-  }
+  return { query, result: catalogAPI.search(query) };
 };
