@@ -223,6 +223,7 @@ export function toRepositoryDetail(
     shortDescription: orUndefined(repository.display_data?.short_description),
     ...toDescription(repository),
     publisher: orUndefined(query.get_repository_vendor_by_registry_path?.data?.name ?? repository.vendor_label),
+    logoUrl: orUndefined(query.get_repository_vendor_by_registry_path?.data?.logo_url),
     requiresTerms: !!repository.requires_terms,
     eolDate: orUndefined(repository.eol_date),
     documentationLinks: toDocumentationLinks(repository),

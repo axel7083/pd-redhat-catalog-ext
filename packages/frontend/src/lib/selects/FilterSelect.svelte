@@ -58,15 +58,32 @@ function clear(event: MouseEvent): void {
 }
 
 /**
- * Opening the list focuses its search input, so the user can type right away.
+ * Opening the list focuses its search input, so the user can type right away. Without scrolling: the focus would
+ * scroll the page to the input.
  */
 function focusOnOpen(input: HTMLInputElement): void {
-  input.focus();
+  input.focus({ preventScroll: true });
+}
+
+/**
+ * The list is wider than the trigger: under the last filters of the bar, it is aligned on the right edge of the
+ * trigger instead of overflowing the page (and scrolling it sideways).
+ */
+let alignRight = $state(false);
+
+function placeOnOpen(list: HTMLElement): void {
+  alignRight = list.getBoundingClientRect().right > document.documentElement.clientWidth;
+}
+
+function toggleList(): void {
+  if (open) close();
+  else open = true;
 }
 
 function close(): void {
   open = false;
   filter = '';
+  alignRight = false;
 }
 
 function onwindowclick(event: MouseEvent): void {
@@ -98,7 +115,7 @@ function onkeydown(event: KeyboardEvent): void {
     aria-haspopup="listbox"
     aria-expanded={open}
     title={selected.length ? `${label}: ${selected.join(', ')}` : label}
-    onclick={(): boolean => (open = !open)}>
+    onclick={toggleList}>
     <span class="grow truncate">{summary}</span>
     {#if selected.length}
       <span
@@ -118,7 +135,11 @@ function onkeydown(event: KeyboardEvent): void {
 
   {#if open}
     <div
-      class="absolute z-50 mt-1 w-max min-w-full max-w-[22rem] max-h-80 flex flex-col rounded-[4px] border border-[var(--pd-input-field-stroke)] bg-[var(--pd-dropdown-bg)] shadow-lg"
+      {@attach placeOnOpen}
+      class={[
+        'absolute z-50 mt-1 w-max min-w-full max-w-[22rem] max-h-80 flex flex-col rounded-[4px] border border-[var(--pd-input-field-stroke)] bg-[var(--pd-dropdown-bg)] shadow-lg',
+        alignRight ? 'right-0' : 'left-0',
+      ]}
       role="listbox"
       aria-multiselectable="true"
       aria-label="{label} values">

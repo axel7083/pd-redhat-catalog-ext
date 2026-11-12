@@ -89,6 +89,7 @@ export const RepositoryDetailDocument = graphql(`
     get_repository_vendor_by_registry_path(registry: $registry, repository: $repository) {
       data {
         name
+        logo_url
       }
     }
     find_repository_images_by_registry_path(

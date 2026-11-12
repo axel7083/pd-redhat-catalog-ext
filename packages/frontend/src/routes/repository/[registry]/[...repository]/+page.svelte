@@ -8,6 +8,7 @@ import GradeBadge from '$lib/badges/GradeBadge.svelte';
 import HardenedBadge from '$lib/badges/HardenedBadge.svelte';
 import Label from '$lib/badges/Label.svelte';
 import RepositoryIcon from '$lib/icons/RepositoryIcon.svelte';
+import RepositoryLogo from '$lib/icons/RepositoryLogo.svelte';
 import PlatformSelect from '$lib/selects/PlatformSelect.svelte';
 import { dialogAPI, readRouterState } from '/@/api/client';
 import { hostArchitecture } from '/@/stores/host';
@@ -86,7 +87,14 @@ async function retry(reset: () => void): Promise<void> {
   onbreadcrumbClick={close}
   onclose={close}>
   {#snippet iconSnippet()}
-    <RepositoryIcon size={28} />
+    {#await data.detail}
+      <!-- same size as the logo: the header does not move -->
+      <div class="w-10 h-10 rounded-md bg-[var(--pd-label-bg)] animate-pulse" aria-hidden="true"></div>
+    {:then detail}
+      <RepositoryLogo url={detail.logoUrl} name={detail.publisher ?? detail.repository} />
+    {:catch}
+      <div class="w-10 h-10 flex items-center justify-center"><RepositoryIcon size={28} /></div>
+    {/await}
   {/snippet}
   {#snippet actionsSnippet()}
     {#await data.detail then detail}

@@ -64,7 +64,7 @@ function image(id: string, architecture: string, digest: string, tags: string[],
 
 const QUERY: RepositoryDetailQuery = {
   latest_build: null,
-  get_repository_vendor_by_registry_path: { data: { name: 'Red Hat' } },
+  get_repository_vendor_by_registry_path: { data: { name: 'Red Hat', logo_url: 'https://example.com/logo.svg' } },
   get_repository_by_registry_path: {
     error: null,
     data: {
@@ -118,6 +118,7 @@ describe('toRepositoryDetail', () => {
         documentationLinks: [{ title: 'Docs', type: 'documentation', url: 'https://example.com' }],
         recommendedTag: '1-200',
         publisher: 'Red Hat',
+        logoUrl: 'https://example.com/logo.svg',
         totalImages: 600,
         catalogUrl: 'https://catalog.redhat.com/software/containers/rhel9/postgresql-16/repo-id',
       }),

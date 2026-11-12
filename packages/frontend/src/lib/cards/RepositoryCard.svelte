@@ -13,11 +13,10 @@ import { resolve } from '$app/paths';
 import GradeBadge from '$lib/badges/GradeBadge.svelte';
 import HardenedBadge from '$lib/badges/HardenedBadge.svelte';
 import Label from '$lib/badges/Label.svelte';
+import RepositoryLogo from '$lib/icons/RepositoryLogo.svelte';
 import { catalogAPI, imageAPI } from '/@/api/client';
 import { localImages } from '/@/stores/local-images';
 import { findPull, pulls } from '/@/stores/pulls';
-import type { LogoKind } from '/@/utils/logo';
-import { isCorsLogoHost, readLogo } from '/@/utils/logo';
 import { repositoryPrefixes } from '/@/utils/repository';
 
 interface Props {
@@ -30,7 +29,6 @@ interface Props {
 
 let { object: repository, connection }: Props = $props();
 
-let logoFailed = $state(false);
 let hardened = $derived(repository.buildCategories.includes('Hardened'));
 let deprecated = $derived(repository.releaseCategories.includes('Deprecated'));
 let updated = $derived(repository.pushDate ?? repository.lastModified);
@@ -39,24 +37,6 @@ let updated = $derived(repository.pushDate ?? repository.lastModified);
  * the repository name (hi/loki → loki) reads better, the badge says it is hardened.
  */
 let title = $derived(hardened ? repository.repository.replace(/^hi\//, '') : repository.title);
-
-let initial = $derived((repository.publisher ?? repository.repository).trim().charAt(0).toUpperCase());
-
-let logoKind: LogoKind | undefined = $state(undefined);
-let corsLogo = $derived(!!repository.logoUrl && isCorsLogoHost(repository.logoUrl));
-
-/**
- * Classify the logo once loaded: wide wordmarks fall back to the publisher initial, white artwork gets a dark tile.
- * Also handles images already loaded (cached) when the element is attached.
- */
-function classifyOnLoad(image: HTMLImageElement): () => void {
-  const classify = (): void => {
-    if (image.naturalWidth) logoKind = readLogo(image);
-  };
-  if (image.complete) classify();
-  image.addEventListener('load', classify);
-  return (): void => image.removeEventListener('load', classify);
-}
 
 let prefetched = false;
 /**
@@ -128,30 +108,7 @@ function dismissError(): void {
   role="group"
   aria-label={repository.title}>
   <div class="flex flex-row grow gap-x-3 p-3 min-w-0">
-    <div class="w-10 h-10 min-w-10 flex items-center justify-center">
-      {#if repository.logoUrl && logoKind !== 'wide' && !logoFailed}
-        <!-- the tile contrasts with the artwork: white logos on a dark tile, the others on a light one -->
-        <div
-          class={[
-            'w-10 h-10 flex items-center justify-center rounded-md p-1',
-            logoKind === 'light' ? 'bg-[var(--pd-content-bg)]' : 'bg-white',
-          ]}>
-          <img
-            src={repository.logoUrl}
-            alt=""
-            crossorigin={corsLogo ? 'anonymous' : undefined}
-            class="max-w-full max-h-full object-contain"
-            {@attach classifyOnLoad}
-            onerror={(): boolean => (logoFailed = true)} />
-        </div>
-      {:else}
-        <div
-          class="w-10 h-10 flex items-center justify-center rounded-md bg-[var(--pd-label-bg)] text-[var(--pd-label-text)] text-lg font-semibold"
-          aria-hidden="true">
-          {initial}
-        </div>
-      {/if}
-    </div>
+    <RepositoryLogo url={repository.logoUrl} name={repository.publisher ?? repository.repository} />
     <div class="flex flex-col grow min-w-0 gap-y-1">
       <div class="flex flex-row items-start gap-x-2">
         <!-- the link covers the whole card (after:inset-0); the buttons are layered above it -->

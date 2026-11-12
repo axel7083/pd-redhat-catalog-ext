@@ -81,6 +81,10 @@ export interface RepositoryDetail {
   description?: string;
   descriptionFormat: 'markdown' | 'html';
   publisher?: string;
+  /**
+   * Logo of the publisher (vendor).
+   */
+  logoUrl?: string;
   requiresTerms: boolean;
   eolDate?: string;
   documentationLinks: DocumentationLink[];
