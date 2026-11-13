@@ -39,7 +39,7 @@
     "@podman-desktop/api": "^1.30.5",
     "@types/semver": "^7.7.1",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
-    "@typescript-eslint/parser": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.2",
     "@vitest/coverage-v8": "^5.0.5",
     "@vitest/eslint-plugin": "^1.6.28",
     "concurrently": "^10.0.6",
