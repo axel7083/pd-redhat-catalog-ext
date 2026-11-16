@@ -62,6 +62,15 @@ const SORTS: Record<SortKey, string> = {
 
 const HARDENED_BOOST = 'build_categories_list:Hardened^1000';
 const REDHAT_BOOST = 'partnerName:"Red Hat"^100';
+/**
+ * Images to run or build on, with a logo, before operator bundles and components: browsing reads better.
+ */
+const RUNNABLE_BOOST = 'build_categories_list:("Standalone image" OR "Builder image")^50';
+const LOGO_BOOST = 'logo_uri:[* TO *]^30';
+/**
+ * Pushed in the last 6 months: `lastModifiedDate` is refreshed by the index for every repository, not a signal.
+ */
+const RECENT_BOOST = 'push_date:[NOW-180DAYS TO NOW]^40';
 
 const SCOPE_FILTERS: Record<SearchScope, string | undefined> = {
   all: undefined,
@@ -98,12 +107,17 @@ export function normalizePage(query: SearchQuery): { page: number; pageSize: num
 /**
  * Ranking boosts (bq). Without search text, "relevance" alone means "most recently modified", which surfaces
  * whatever partner pushed last (often re-uploads of Red Hat images). The default landing of the All scope
- * ranks Hardened images, then Red Hat repositories, then the rest; nothing is filtered out.
+ * ranks Hardened images, then Red Hat repositories, then recent runnable images with a logo, then the rest; the
+ * other scopes rank the recent runnable images with a logo first. Nothing is filtered out.
  */
 export function boosts(query: SearchQuery, hasText: boolean): string[] {
   const relevance = (query.sort ?? 'relevance') === 'relevance';
-  if (relevance && !hasText && (query.scope ?? 'all') === 'all') return [HARDENED_BOOST, REDHAT_BOOST];
-  return query.hardenedFirst ? [HARDENED_BOOST] : [];
+  const landing = relevance && !hasText;
+  if (landing && (query.scope ?? 'all') === 'all') {
+    return [HARDENED_BOOST, REDHAT_BOOST, RUNNABLE_BOOST, LOGO_BOOST, RECENT_BOOST];
+  }
+  const boosts = query.hardenedFirst ? [HARDENED_BOOST] : [];
+  return landing ? [...boosts, RUNNABLE_BOOST, LOGO_BOOST, RECENT_BOOST] : boosts;
 }
 
 export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {
@@ -125,6 +139,10 @@ export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {
   for (const field of FACET_FIELDS) {
     const values = query.filters?.[field]?.filter(value => value.length > 0);
     if (values?.length) params.append('fq', facetFilter(field, values));
+  }
+
+  if (query.repositories?.length) {
+    params.append('fq', `repository:(${query.repositories.map(quoteSolrValue).join(' OR ')})`);
   }
 
   params.set('q', text?.length ? text : '*:*');

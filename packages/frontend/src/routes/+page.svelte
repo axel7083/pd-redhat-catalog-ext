@@ -1,3 +1,10 @@
+<script module lang="ts">
+/**
+ * Scroll position of the front page, restored when coming back to it (back button, or back from a repository).
+ */
+let frontPageScroll = 0;
+</script>
+
 <script lang="ts">
 import { faWarning } from '@fortawesome/free-solid-svg-icons';
 import type {
@@ -10,8 +17,9 @@ import { SCOPE_LABELS, SEARCH_SCOPES, SORT_KEYS, SORT_LABELS } from '@podman-des
 import { Button, EmptyScreen, NavPage, SearchInput, Tab } from '@podman-desktop/ui-svelte';
 import { untrack } from 'svelte';
 
-import { goto, invalidateAll } from '$app/navigation';
+import { afterNavigate, beforeNavigate, goto, invalidateAll } from '$app/navigation';
 import { resolve } from '$app/paths';
+import FrontPage from '$lib/home/FrontPage.svelte';
 import SearchResults from '$lib/explore/SearchResults.svelte';
 import SearchSkeleton from '$lib/explore/SearchSkeleton.svelte';
 import FilterSelect from '$lib/selects/FilterSelect.svelte';
@@ -19,12 +27,28 @@ import Select from '$lib/selects/Select.svelte';
 import ContainerProviderConnectionSelect from '$lib/selects/ContainerProviderConnectionSelect.svelte';
 import { selectedConnection } from '/@/states/connection.svelte';
 import { providerConnectionsInfo } from '/@/stores/connections';
-import { toSearchParams, updateQuery } from '/@/utils/search-params';
+import { hasFilters, toSearchParams, updateQuery } from '/@/utils/search-params';
 import type { PageProps } from './$types';
 
 let { data }: PageProps = $props();
 
 let query = $derived(data.query);
+
+/**
+ * The catalog without any search: the front page, instead of the full list.
+ */
+let frontPage = $derived(
+  !query.text?.trim() &&
+    !hasFilters(query) &&
+    (query.scope ?? 'all') === 'all' &&
+    !query.page &&
+    (query.sort ?? 'relevance') === 'relevance',
+);
+
+/**
+ * The search of the whole catalog: total and facet counts of the front page.
+ */
+let catalog: SearchResult | undefined = $state.raw(undefined);
 
 // writable derived: follows the URL, and the input while typing
 let text = $derived(query.text ?? '');
@@ -37,6 +61,26 @@ function href(next: SearchQuery): string {
   const params = toSearchParams(next).toString();
   return `${resolve('/')}${params ? `?${params}` : ''}`;
 }
+
+/**
+ * The page scrolls in #explore, not the window: SvelteKit does not reset nor restore it. Following a link ("See all",
+ * a category, a tab) opens the results at the top; going back to the front page restores where the user was.
+ * Query changes (search, filters, sort) keep the position: the filter bar is sticky.
+ */
+beforeNavigate(() => {
+  if (frontPage) frontPageScroll = document.getElementById('explore')?.scrollTop ?? 0;
+});
+
+afterNavigate(({ type }) => {
+  const explore = document.getElementById('explore');
+  if (!explore) return;
+  if (type === 'popstate' && frontPage) {
+    // after the front page is rendered (it is replaced by the results on the same page)
+    requestAnimationFrame(() => explore.scrollTo({ top: frontPageScroll }));
+  } else if (type === 'link') {
+    explore.scrollTo({ top: 0 });
+  }
+});
 
 function navigate(next: SearchQuery): Promise<void> {
   // eslint-disable-next-line svelte/no-navigation-without-resolve
@@ -63,6 +107,8 @@ const FILTERS: Array<{ field: FacetField; label: string; width: string }> = [
   { field: 'architecture', label: 'Architecture', width: 'w-44' },
   { field: 'build_categories_list', label: 'Image type', width: 'w-52' },
   { field: 'application_categories_list', label: 'Category', width: 'w-56' },
+  // ~900 values: the list is searchable
+  { field: 'product_listings_names', label: 'Product', width: 'w-56' },
 ];
 
 /**
@@ -73,7 +119,9 @@ $effect(() => {
   const promise = data.result;
   promise
     .then(result => {
-      if (promise === data.result) facets = result.facets;
+      if (promise !== data.result) return;
+      facets = result.facets;
+      if (frontPage) catalog = result;
     })
     .catch(() => {
       // the error is shown by the results boundary
@@ -149,30 +197,34 @@ async function retry(reset: () => void): Promise<void> {
         </div>
       </div>
 
-      <svelte:boundary>
-        <SearchResults
-          query={query}
-          result={data.result}
-          connection={connection}
-          onclear={(): Promise<void> => navigate(updateQuery(query, { filters: {} }))}
-          onpage={onpage} />
+      {#if frontPage}
+        <FrontPage catalog={catalog} />
+      {:else}
+        <svelte:boundary>
+          <SearchResults
+            query={query}
+            result={data.result}
+            connection={connection}
+            onclear={(): Promise<void> => navigate(updateQuery(query, { filters: {} }))}
+            onpage={onpage} />
 
-        {#snippet pending()}
-          <SearchSkeleton />
-        {/snippet}
+          {#snippet pending()}
+            <SearchSkeleton />
+          {/snippet}
 
-        {#snippet failed(error, reset)}
-          <EmptyScreen
-            icon={faWarning}
-            title="Something went wrong while searching the catalog"
-            aria-label="Error while searching the catalog"
-            message={error instanceof Error ? error.message : String(error)}>
-            <div class="flex gap-2 justify-center">
-              <Button title="Retry" type="link" onclick={(): Promise<void> => retry(reset)}>Retry</Button>
-            </div>
-          </EmptyScreen>
-        {/snippet}
-      </svelte:boundary>
+          {#snippet failed(error, reset)}
+            <EmptyScreen
+              icon={faWarning}
+              title="Something went wrong while searching the catalog"
+              aria-label="Error while searching the catalog"
+              message={error instanceof Error ? error.message : String(error)}>
+              <div class="flex gap-2 justify-center">
+                <Button title="Retry" type="link" onclick={(): Promise<void> => retry(reset)}>Retry</Button>
+              </div>
+            </EmptyScreen>
+          {/snippet}
+        </svelte:boundary>
+      {/if}
     </div>
   {/snippet}
 </NavPage>

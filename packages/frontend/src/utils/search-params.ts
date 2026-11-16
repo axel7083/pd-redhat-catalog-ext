@@ -88,3 +88,11 @@ export function setFilter(query: SearchQuery, field: FacetField, value: string |
 export function hasFilters(query: SearchQuery): boolean {
   return Object.values(query.filters ?? {}).some(values => values.length > 0);
 }
+
+/**
+ * Query string (with its `?`, or empty) of the catalog for a query: links are `resolve('/') + catalogSearch(query)`.
+ */
+export function catalogSearch(query: SearchQuery): string {
+  const params = toSearchParams(query).toString();
+  return params ? `?${params}` : '';
+}

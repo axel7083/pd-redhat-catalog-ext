@@ -35,7 +35,13 @@ describe('buildHydraSearchParams', () => {
     expect(params.get('start')).toBe('0');
     expect(params.get('rows')).toBe('24');
     // the landing page ranks Hardened images, then Red Hat repositories
-    expect(params.getAll('bq')).toEqual(['build_categories_list:Hardened^1000', 'partnerName:"Red Hat"^100']);
+    expect(params.getAll('bq')).toEqual([
+      'build_categories_list:Hardened^1000',
+      'partnerName:"Red Hat"^100',
+      'build_categories_list:("Standalone image" OR "Builder image")^50',
+      'logo_uri:[* TO *]^30',
+      'push_date:[NOW-180DAYS TO NOW]^40',
+    ]);
   });
 
   test('never requests the id facet', () => {
@@ -105,7 +111,20 @@ test.each([
 test.each([
   { name: 'search text', query: { text: 'nginx' } },
   { name: 'another sort', query: { sort: 'title-asc' as const } },
-  { name: 'another scope', query: { scope: 'partners' as const } },
 ])('no default boost with $name', ({ query }) => {
   expect(buildHydraSearchParams(query).getAll('bq')).toEqual([]);
+});
+
+test('the landing of another scope ranks recent runnable images with a logo first', () => {
+  expect(buildHydraSearchParams({ scope: 'partners' }).getAll('bq')).toEqual([
+    'build_categories_list:("Standalone image" OR "Builder image")^50',
+    'logo_uri:[* TO *]^30',
+    'push_date:[NOW-180DAYS TO NOW]^40',
+  ]);
+});
+
+test('a curated selection filters on the repository paths', () => {
+  expect(buildHydraSearchParams({ repositories: ['ubi10/ubi', 'hi/python'] }).getAll('fq')).toContain(
+    'repository:("ubi10/ubi" OR "hi/python")',
+  );
 });

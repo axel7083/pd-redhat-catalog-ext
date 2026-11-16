@@ -64,13 +64,14 @@ export const SCOPE_LABELS: Record<SearchScope, string> = {
 };
 
 /**
- * Facets offered as dropdowns on the explore page; the others are too large (publisher: ~500 values,
- * product: ~900) or redundant with a scope.
+ * Facets offered as dropdowns on the explore page; the others are too large (publisher: ~500 values) or redundant
+ * with a scope.
  */
 export const FILTER_FIELDS = [
   'architecture',
   'build_categories_list',
   'application_categories_list',
+  'product_listings_names',
 ] as const satisfies FacetField[];
 
 export const DEFAULT_PAGE_SIZE = 24;
@@ -88,6 +89,10 @@ export interface SearchQuery {
    * Selected values per facet. Values of the same facet are OR-ed, facets are AND-ed.
    */
   filters?: Partial<Record<FacetField, string[]>>;
+  /**
+   * Only these repositories (paths without the registry, e.g. `ubi10/ubi`): the picks of a front page collection.
+   */
+  repositories?: string[];
   /**
    * Repositories in the Deprecated release category are hidden unless this is true.
    */
