@@ -3,9 +3,8 @@ import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import type { SearchResult } from '@podman-desktop/extension-redhat-catalog-core-api';
 import Fa from 'svelte-fa';
 
-import { resolve } from '$app/paths';
 import { catalogAPI } from '/@/api/client';
-import { catalogSearch } from '/@/utils/search-params';
+import { catalogHref } from '/@/utils/search-params';
 import CollectionTiles from './CollectionTiles.svelte';
 import type { Collection } from './content';
 
@@ -26,7 +25,7 @@ let result: Promise<SearchResult> = $derived(
 );
 </script>
 
-<!-- link to the catalog with a query string: resolve('/') + catalogSearch(), which the rule does not recognize -->
+<!-- link to the catalog with a query string: catalogHref(), which the rule does not recognize -->
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 <section class="flex flex-col gap-y-3" aria-label={collection.title}>
   <div class="flex flex-row items-end gap-x-3">
@@ -36,7 +35,7 @@ let result: Promise<SearchResult> = $derived(
     </div>
     {#if collection.query}
       <a
-        href={resolve('/') + catalogSearch(collection.query)}
+        href={catalogHref(collection.query)}
         class="flex shrink-0 items-center gap-x-1.5 text-sm text-[var(--pd-link)] no-underline hover:underline"
         aria-label="See all {collection.title}">
         See all <Fa icon={faArrowRight} size="0.85x" />

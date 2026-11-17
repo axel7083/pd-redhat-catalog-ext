@@ -17,12 +17,12 @@
  ***********************************************************************/
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import { getRouterState } from '/@/api/client';
+import { readRouterState } from '/@/api/client';
 import { selectedConnection } from '/@/states/connection.svelte';
 import { init } from './hooks.client';
 
 vi.mock(import('/@/api/client'), () => ({
-  getRouterState: vi.fn(),
+  readRouterState: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 test('restores the page and the engine left', async () => {
-  vi.mocked(getRouterState).mockResolvedValue({
+  vi.mocked(readRouterState).mockReturnValue({
     url: '/repository/registry.access.redhat.com/ubi9/ubi?tab=packages&arch=arm64',
     explore: '/?q=ubi',
     connection: 'podman:podman-machine-default',
@@ -49,17 +49,27 @@ test('restores the page and the engine left', async () => {
 });
 
 test('stays on the initial location for the explore root', async () => {
-  vi.mocked(getRouterState).mockResolvedValue({ url: '/' });
+  vi.mocked(readRouterState).mockReturnValue({ url: '/' });
 
   await init();
 
   expect(history.replaceState).not.toHaveBeenCalled();
 });
 
-test('a failure to read the state does not block the start', async () => {
-  vi.mocked(getRouterState).mockRejectedValue(new Error('Timeout'));
+test('a failure to read the state does not block the start', () => {
+  vi.mocked(readRouterState).mockImplementation(() => {
+    throw new Error('no state');
+  });
   vi.spyOn(console, 'error').mockImplementation(() => {});
 
-  await expect(init()).resolves.toBeUndefined();
+  expect(() => init()).not.toThrow();
   expect(history.replaceState).not.toHaveBeenCalled();
+});
+
+test('a catalog search saved by a former version (the root page) is restored on the catalog page', async () => {
+  vi.mocked(readRouterState).mockReturnValue({ url: '/?q=ubi&scope=partners' });
+
+  await init();
+
+  expect(history.replaceState).toHaveBeenCalledWith(history.state, '', '/catalog?q=ubi&scope=partners');
 });

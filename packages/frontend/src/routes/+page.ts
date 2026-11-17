@@ -15,22 +15,18 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ***********************************************************************/
-import type { SearchQuery, SearchResult } from '@podman-desktop/extension-redhat-catalog-core-api';
+import type { SearchResult } from '@podman-desktop/extension-redhat-catalog-core-api';
 
 import { catalogAPI } from '/@/api/client';
-import { toSearchQuery } from '/@/utils/search-params';
 import type { PageLoad } from './$types';
 
 interface Data {
-  query: SearchQuery;
   /**
-   * Not awaited: the navigation completes immediately (search box, filters and URL update at once) and the
-   * results render through `await` in a boundary, see SearchResults.svelte.
+   * The catalog without a search: only its facet counts are used (the categories), not the repositories.
    */
-  result: Promise<SearchResult>;
+  catalog: Promise<SearchResult>;
 }
 
-export const load: PageLoad = ({ url }): Data => {
-  const query = toSearchQuery(url.searchParams);
-  return { query, result: catalogAPI.search(query) };
+export const load: PageLoad = (): Data => {
+  return { catalog: catalogAPI.search({ page: 0, pageSize: 1 }) };
 };

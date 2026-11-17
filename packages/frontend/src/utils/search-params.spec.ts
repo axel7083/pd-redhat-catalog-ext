@@ -18,6 +18,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  catalogHref,
   hasFilters,
   setFilter,
   toggleFilter,
@@ -85,4 +86,17 @@ test('scope defaults to all and is omitted from the URL', () => {
   expect(toSearchQuery(new URLSearchParams('scope=unknown')).scope).toBe('all');
   expect(toSearchParams({ scope: 'all' }).has('scope')).toBe(false);
   expect(toSearchParams({ scope: 'hardened' }).get('scope')).toBe('hardened');
+});
+
+test('the former Hardened scope is read as the Hardened image type (no tab shows a scope anymore)', () => {
+  const query = toSearchQuery(new URLSearchParams('scope=hardened&f.build_categories_list=Builder+image'));
+  expect(query.scope).toBe('all');
+  expect(query.filters?.build_categories_list).toEqual(['Builder image', 'Hardened']);
+});
+
+test('catalogHref is the catalog page, with the query string when there is one', () => {
+  expect(catalogHref({})).toBe('/catalog');
+  expect(catalogHref({ text: 'ubi', filters: { build_categories_list: ['Hardened'] } })).toBe(
+    '/catalog?q=ubi&f.build_categories_list=Hardened',
+  );
 });

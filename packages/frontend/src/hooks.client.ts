@@ -17,19 +17,22 @@
  ***********************************************************************/
 import type { ClientInit } from '@sveltejs/kit';
 
-import { getRouterState } from '/@/api/client';
+import { readRouterState } from '/@/api/client';
 import { selectedConnection } from '/@/states/connection.svelte';
 
 /**
  * Runs before the router reads the location: the webview opens directly on the page the user left, instead of
- * rendering (and searching) the explore page first then navigating. The explore page left is read by the repository
- * pages (breadcrumb).
+ * rendering the home page first then navigating. The catalog page left is read by the repository pages (breadcrumb).
+ * Synchronous on purpose: the saved state is local, while a request to the extension may get no answer when the webview
+ * was just recreated (a route requested by the extension is read by the layout, see +layout.svelte).
  */
-export const init: ClientInit = async () => {
+export const init: ClientInit = () => {
   try {
-    const state = await getRouterState();
+    const state = readRouterState();
     if (state.connection) selectedConnection.key = state.connection;
-    if (state.url !== '/') history.replaceState(history.state, '', state.url);
+    // before 0.4.0 the catalog search was the root page (`/?q=…`): it is the catalog page now
+    const url = state.url.startsWith('/?') ? `/catalog${state.url.slice(1)}` : state.url;
+    if (url !== '/') history.replaceState(history.state, '', url);
   } catch (error: unknown) {
     console.error('Unable to restore the webview state', error);
   }

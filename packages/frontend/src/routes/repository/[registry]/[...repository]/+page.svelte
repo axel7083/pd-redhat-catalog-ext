@@ -3,6 +3,7 @@ import { faExternalLink, faWarning } from '@fortawesome/free-solid-svg-icons';
 import { Button, DetailsPage, EmptyScreen, Tab } from '@podman-desktop/ui-svelte';
 
 import { afterNavigate, beforeNavigate, goto, invalidateAll } from '$app/navigation';
+import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import GradeBadge from '$lib/badges/GradeBadge.svelte';
 import HardenedBadge from '$lib/badges/HardenedBadge.svelte';
@@ -55,22 +56,33 @@ function selectArchitecture(value: string): void {
 }
 
 /**
- * The explore page the repository was opened from (search, scope, filters). Kept across the tab and platform
- * navigations (same component). Without one (the webview was recreated on this page), the explore page saved with the
- * webview state.
+ * Where the repository was opened from: the home page, or the catalog page (with its search and filters). Kept across
+ * the tab and platform navigations (same component). Without one (the webview was recreated on this page), the
+ * catalog page saved with the webview state, else the home page.
  */
-let explore: string = $state(readRouterState().explore ?? '/');
+interface Back {
+  label: string;
+  url: string;
+}
+
+function savedBack(): Back {
+  const catalog = readRouterState().explore;
+  return catalog ? { label: 'Catalog', url: catalog } : { label: 'Home', url: resolve('/') };
+}
+
+let back: Back = $state(savedBack());
 
 afterNavigate(({ from }) => {
-  if (from?.route.id === '/') explore = appLocation(from.url);
+  if (from?.route.id === '/catalog') back = { label: 'Catalog', url: appLocation(from.url) };
+  else if (from?.route.id === '/') back = { label: 'Home', url: appLocation(from.url) };
 });
 
 /**
- * Back to the explore page as it was left; history.back() would step back through tabs.
+ * Back to where the repository was opened from, as it was left; history.back() would step back through tabs.
  */
 function close(): Promise<void> {
   // eslint-disable-next-line svelte/no-navigation-without-resolve
-  return goto(explore);
+  return goto(back.url);
 }
 
 async function retry(reset: () => void): Promise<void> {
@@ -82,7 +94,7 @@ async function retry(reset: () => void): Promise<void> {
 <DetailsPage
   title={data.repository}
   subtitle={data.registry}
-  breadcrumbLeftPart="Catalog"
+  breadcrumbLeftPart={back.label}
   breadcrumbRightPart={data.repository}
   onbreadcrumbClick={close}
   onclose={close}>

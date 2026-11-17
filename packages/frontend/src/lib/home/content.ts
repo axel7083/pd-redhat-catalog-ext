@@ -118,8 +118,7 @@ export const COLLECTIONS: Collection[] = [
     title: 'Red Hat Hardened Images',
     description: 'Minimal and distroless, rebuilt continuously with no known CVEs',
     icon: faShieldHalved,
-    // the Hardened images tab of the catalog
-    query: { scope: 'hardened' },
+    query: { filters: { build_categories_list: ['Hardened'] } },
     picks: ['hi/python', 'hi/nodejs', 'hi/openjdk', 'hi/go', 'hi/nginx', 'hi/postgresql', 'hi/rust', 'hi/httpd'].map(
       repository => ({ repository }),
     ),

@@ -18,12 +18,14 @@
 import type { FacetField, SearchQuery, SearchScope, SortKey } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { FACET_FIELDS, SEARCH_SCOPES, SORT_KEYS } from '@podman-desktop/extension-redhat-catalog-core-api';
 
+import { resolve } from '$app/paths';
+
 /**
- * The explore page state lives in the URL, so it survives a webview reload (see saveRouterState)
+ * The catalog page state lives in the URL, so it survives a webview reload (see saveRouterState)
  * and the browser history works.
  *
  * - `q`: free text
- * - `scope`: all (default), redhat, hardened, partners
+ * - `scope`: all (default), redhat, partners (`hardened` is read as the Hardened image type: no tab shows it anymore)
  * - `f.<facet>`: selected values, repeated
  * - `sort`, `page` (1-based), `deprecated=1`, `hardened=1`
  */
@@ -39,9 +41,12 @@ export function toSearchQuery(params: URLSearchParams): SearchQuery {
   const scope = params.get('scope');
   const page = Number.parseInt(params.get('page') ?? '1', 10);
 
+  if (scope === 'hardened') {
+    filters.build_categories_list = [...new Set([...(filters.build_categories_list ?? []), 'Hardened'])];
+  }
   return {
     text: params.get('q') ?? undefined,
-    scope: SEARCH_SCOPES.includes(scope as SearchScope) ? (scope as SearchScope) : 'all',
+    scope: scope !== 'hardened' && SEARCH_SCOPES.includes(scope as SearchScope) ? (scope as SearchScope) : 'all',
     filters,
     sort: SORT_KEYS.includes(sort as SortKey) ? (sort as SortKey) : 'relevance',
     page: Number.isFinite(page) && page > 0 ? page - 1 : 0,
@@ -90,9 +95,9 @@ export function hasFilters(query: SearchQuery): boolean {
 }
 
 /**
- * Query string (with its `?`, or empty) of the catalog for a query: links are `resolve('/') + catalogSearch(query)`.
+ * URL of the catalog page for a query.
  */
-export function catalogSearch(query: SearchQuery): string {
+export function catalogHref(query: SearchQuery): string {
   const params = toSearchParams(query).toString();
-  return params ? `?${params}` : '';
+  return params ? `${resolve('/catalog')}?${params}` : resolve('/catalog');
 }

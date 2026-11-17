@@ -39,7 +39,7 @@ import type { PodmanDesktopApi } from '../../../../types/podman-desktop-api';
 export interface RouterState {
   url: string;
   /**
-   * The explore page left (search, scope, filters): the breadcrumb of a repository goes back to it.
+   * The catalog page left (search, filters): the breadcrumb of a repository goes back to it.
    */
   explore?: string;
   /**
@@ -87,11 +87,4 @@ const isRouterState = (value: unknown): value is RouterState => {
 export function readRouterState(): RouterState {
   const state = api.getState();
   return isRouterState(state) ? state : { url: '/' };
-}
-
-export async function getRouterState(): Promise<RouterState> {
-  const saved = readRouterState();
-  // a route requested by the extension (e.g. a command) wins over the saved one
-  const route: string | undefined = await routingAPI.readRoute();
-  return route ? { ...saved, url: route } : saved;
 }

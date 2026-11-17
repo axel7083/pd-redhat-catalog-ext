@@ -2,9 +2,8 @@
 import { faArrowRight, faArrowUpRightFromSquare } from '@fortawesome/free-solid-svg-icons';
 import Fa from 'svelte-fa';
 
-import { resolve } from '$app/paths';
 import { dialogAPI } from '/@/api/client';
-import { catalogSearch } from '/@/utils/search-params';
+import { catalogHref } from '/@/utils/search-params';
 import type { Article } from './content';
 import { ARTICLES, COLLECTIONS } from './content';
 
@@ -26,7 +25,7 @@ function open(article: Article): void {
 }
 </script>
 
-<!-- link to the catalog with a query string: resolve('/') + catalogSearch(), which the rule does not recognize -->
+<!-- link to the catalog with a query string: catalogHref(), which the rule does not recognize -->
 <!-- eslint-disable svelte/no-navigation-without-resolve -->
 
 <section
@@ -49,7 +48,7 @@ function open(article: Article): void {
     <div class="flex flex-row flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       {#if leadCollection?.query}
         <a
-          href={resolve('/') + catalogSearch(leadCollection.query)}
+          href={catalogHref(leadCollection.query)}
           class="flex items-center gap-x-1.5 rounded-md bg-[var(--pd-button-primary-bg)] px-3 py-1.5 text-[var(--pd-button-text)] no-underline hover:bg-[var(--pd-button-primary-hover-bg)]">
           Browse {leadCollection.title}
           <Fa icon={faArrowRight} size="0.85x" />

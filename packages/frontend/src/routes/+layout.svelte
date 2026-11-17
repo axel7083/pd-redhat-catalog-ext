@@ -3,7 +3,7 @@
 import '/@/app.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { onMount } from 'svelte';
-import { readRouterState, rpcBrowser, saveRouterState } from '/@/api/client';
+import { readRouterState, routingAPI, rpcBrowser, saveRouterState } from '/@/api/client';
 import { afterNavigate, goto } from '$app/navigation';
 import { page } from '$app/state';
 import { Messages } from '@podman-desktop/extension-redhat-catalog-core-api';
@@ -13,22 +13,36 @@ import { appLocation } from '/@/utils/location';
 let { children } = $props();
 
 /**
- * The last explore page (search, scope, filters), saved for the breadcrumb of the repository pages.
+ * Where the user is (path and query), and the last catalog page (search, filters) for the breadcrumb of the repository
+ * pages. Taken from the navigations rather than page.url: while the data of the new page loads, async Svelte holds
+ * page.url on the previous page, and the previous page would be saved.
  */
+let url: string = $state(appLocation(page.url));
 let explore: string | undefined = $state(readRouterState().explore);
 
 afterNavigate(({ to }) => {
-  if (to?.route.id === '/') explore = appLocation(to.url);
+  if (!to) return;
+  url = appLocation(to.url);
+  if (to.route.id === '/catalog') explore = url;
 });
 
 /**
  * Podman Desktop destroys the webview when the user leaves it: save where they are (restored by hooks.client.ts).
  */
 $effect(() => {
-  saveRouterState({ url: appLocation(page.url), explore, connection: selectedConnection.key });
+  saveRouterState({ url, explore, connection: selectedConnection.key });
 });
 
 onMount(() => {
+  // a route requested by the extension (e.g. a command) while the webview was closed: wins over the restored page
+  routingAPI
+    .readRoute()
+    .then(route => {
+      // eslint-disable-next-line svelte/no-navigation-without-resolve
+      if (route) return goto(route);
+    })
+    .catch(console.error);
+
   const unsubscribe = rpcBrowser.subscribe(Messages.ROUTE_UPDATE, location => {
     // eslint-disable-next-line svelte/no-navigation-without-resolve
     goto(location).catch(console.error);
@@ -40,7 +54,7 @@ onMount(() => {
 });
 </script>
 
-<!-- no extension sidebar: Podman Desktop already shows its navigation, scopes are tabs of the explore page -->
+<!-- no extension sidebar: Podman Desktop already shows its navigation; the home page leads to the catalog page -->
 <div class="flex flex-row w-full h-full">
   {@render children()}
 </div>
