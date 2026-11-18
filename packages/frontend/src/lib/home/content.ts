@@ -28,6 +28,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import type { SearchQuery } from '@podman-desktop/extension-redhat-catalog-core-api';
 
+// inlined (data URL): the webview is served under a runtime URL, emitted asset files would not resolve
+import hardenedImagesIllustration from './assets/hardened-images.webp?inline';
+
 export interface Article {
   /**
    * What the article is for the reader, shown above the title.
@@ -42,6 +45,10 @@ export interface Article {
    * The images the article is about.
    */
   collection?: string;
+  /**
+   * Illustration of the lead article (data URL).
+   */
+  illustration?: string;
 }
 
 /**
@@ -58,6 +65,7 @@ export const ARTICLES: Article[] = [
     source: 'Red Hat Developer',
     icon: faShieldHalved,
     collection: 'hardened',
+    illustration: hardenedImagesIllustration,
   },
   {
     kicker: 'Certified explained',
