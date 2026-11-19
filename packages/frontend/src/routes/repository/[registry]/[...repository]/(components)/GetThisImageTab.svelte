@@ -1,5 +1,5 @@
 <script lang="ts">
-import { faCircleExclamation, faDownload, faGlobe, faLock, faPlay, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faGlobe, faLock, faPlay } from '@fortawesome/free-solid-svg-icons';
 import type {
   CatalogImage,
   ProviderContainerConnectionDetailedInfo,
@@ -16,6 +16,7 @@ import {
 import { Button } from '@podman-desktop/ui-svelte';
 import Fa from 'svelte-fa';
 
+import ErrorBox from '$lib/banners/ErrorBox.svelte';
 import RegistryAccessBanner from '$lib/banners/RegistryAccessBanner.svelte';
 import CodeBlock from '$lib/content/CodeBlock.svelte';
 import ExternalContent from '$lib/content/ExternalContent.svelte';
@@ -179,16 +180,7 @@ function dismissError(): void {
     </div>
 
     {#if pullStatus?.status === 'failed'}
-      <div class="flex items-start gap-x-2 text-sm text-[var(--pd-state-error)]" role="alert">
-        <Fa icon={faCircleExclamation} class="mt-0.5" />
-        <span class="grow break-words">{pullStatus.error}</span>
-        <button
-          class="cursor-pointer opacity-70 hover:opacity-100"
-          aria-label="Dismiss the pull error"
-          onclick={dismissError}>
-          <Fa icon={faXmark} />
-        </button>
-      </div>
+      <ErrorBox message={pullStatus.error ?? 'The pull failed'} ondismiss={dismissError} />
     {/if}
 
     {#if localImagesOfRepository.length}

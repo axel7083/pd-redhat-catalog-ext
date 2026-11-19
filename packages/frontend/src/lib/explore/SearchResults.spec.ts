@@ -74,7 +74,6 @@ function props(result: Promise<SearchResult>): Parameters<typeof render<typeof S
     query: {},
     result,
     connection: CONNECTION,
-    onclear: vi.fn(),
     onpage: vi.fn(),
   };
 }
@@ -83,7 +82,6 @@ test('renders facets and cards once the search resolves', async () => {
   const { findByRole, getByText } = render(SearchResults, props(Promise.resolve(RESULT)));
 
   expect(await findByRole('link', { name: 'Red Hat Hardened Images nginx' })).toBeInTheDocument();
-  expect(getByText('1 repository')).toBeInTheDocument();
   expect(getByText('1–1 of 1')).toBeInTheDocument();
 });
 

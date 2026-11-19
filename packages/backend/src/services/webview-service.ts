@@ -42,7 +42,7 @@ export class WebviewService implements Disposable, AsyncInit {
   @postConstruct()
   async init(): Promise<void> {
     // register webview
-    const panel = windowAPI.createWebviewPanel('redhat-catalog', 'Red Hat Catalog', this.getWebviewOptions());
+    const panel = windowAPI.createWebviewPanel('redhat-catalog', 'Catalog', this.getWebviewOptions());
 
     // update html
     const indexHtmlUri = Uri.joinPath(this.#mediaPath, 'index.html');

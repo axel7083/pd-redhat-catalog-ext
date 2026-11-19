@@ -61,6 +61,12 @@ const SORTS: Record<SortKey, string> = {
 };
 
 const HARDENED_BOOST = 'build_categories_list:Hardened^1000';
+/**
+ * With search text: Hardened images first among the good matches, as the Red Hat Ecosystem Catalog does (nginx →
+ * hi/nginx). Strong enough to lift hi/grafana above the other grafana images, weak enough to keep a loose match
+ * (hi/loki-canary for "grafana") below the exact ones.
+ */
+const TEXT_HARDENED_BOOST = 'build_categories_list:Hardened^30';
 const REDHAT_BOOST = 'partnerName:"Red Hat"^100';
 /**
  * Images to run or build on, with a logo, before operator bundles and components: browsing reads better.
@@ -117,7 +123,8 @@ export function boosts(query: SearchQuery, hasText: boolean): string[] {
     return [HARDENED_BOOST, REDHAT_BOOST, RUNNABLE_BOOST, LOGO_BOOST, RECENT_BOOST];
   }
   const boosts = query.hardenedFirst ? [HARDENED_BOOST] : [];
-  return landing ? [...boosts, RUNNABLE_BOOST, LOGO_BOOST, RECENT_BOOST] : boosts;
+  if (landing) return [...boosts, RUNNABLE_BOOST, LOGO_BOOST, RECENT_BOOST];
+  return relevance && hasText && !query.hardenedFirst ? [TEXT_HARDENED_BOOST] : boosts;
 }
 
 export function buildHydraSearchParams(query: SearchQuery): URLSearchParams {

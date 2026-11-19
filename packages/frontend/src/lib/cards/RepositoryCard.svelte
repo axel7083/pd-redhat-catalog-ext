@@ -1,5 +1,5 @@
 <script lang="ts">
-import { faCircleExclamation, faDownload, faPlay, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faPlay } from '@fortawesome/free-solid-svg-icons';
 import type {
   ProviderContainerConnectionDetailedInfo,
   RepositorySummary,
@@ -7,12 +7,12 @@ import type {
 } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { findLocalImage, quickPullTag, toPullSpec } from '@podman-desktop/extension-redhat-catalog-core-api';
 import { Button, TableDurationColumn } from '@podman-desktop/ui-svelte';
-import Fa from 'svelte-fa';
 
 import { resolve } from '$app/paths';
 import GradeBadge from '$lib/badges/GradeBadge.svelte';
 import HardenedBadge from '$lib/badges/HardenedBadge.svelte';
 import Label from '$lib/badges/Label.svelte';
+import ErrorBox from '$lib/banners/ErrorBox.svelte';
 import RepositoryLogo from '$lib/icons/RepositoryLogo.svelte';
 import { catalogAPI, imageAPI } from '/@/api/client';
 import { localImages } from '/@/stores/local-images';
@@ -120,13 +120,10 @@ function dismissError(): void {
           onmouseenter={prefetch}
           onfocus={prefetch}
           class="line-clamp-2 leading-5 text-[var(--pd-content-header)] no-underline after:absolute after:inset-0 after:rounded-lg after:content-['']"
-          title={repository.title}
           aria-label={repository.title}>{title}</a>
         {#if hardened}<HardenedBadge />{/if}
       </div>
-      <div
-        class="truncate text-sm text-[var(--pd-content-text)] opacity-80"
-        title="{repository.registry}/{repository.repository}">
+      <div class="truncate text-sm text-[var(--pd-content-text)] opacity-80">
         {repository.repository}
       </div>
       {#if repository.description}
@@ -136,10 +133,10 @@ function dismissError(): void {
   </div>
 
   <div class="flex flex-row items-center gap-x-2 px-3 pb-3 text-sm text-[var(--pd-content-text)]">
-    <span class="truncate" title="Publisher">{repository.publisher ?? 'Unknown publisher'}</span>
+    <span class="truncate">{repository.publisher ?? 'Unknown publisher'}</span>
     {#if updated}
       <span aria-hidden="true">·</span>
-      <span class="flex gap-x-1 whitespace-nowrap" title="Last updated">
+      <span class="flex gap-x-1 whitespace-nowrap">
         <TableDurationColumn object={new Date(updated)} /> ago
       </span>
     {/if}
@@ -171,18 +168,8 @@ function dismissError(): void {
   </div>
 
   {#if pullError}
-    <div
-      class="relative z-[1] flex items-start gap-x-1 px-3 pb-3 text-xs text-[var(--pd-state-error)]"
-      role="alert"
-      title={pullError}>
-      <Fa icon={faCircleExclamation} class="mt-0.5" />
-      <span class="line-clamp-2 grow">{pullError}</span>
-      <button
-        class="cursor-pointer opacity-70 hover:opacity-100"
-        aria-label="Dismiss the pull error"
-        onclick={dismissError}>
-        <Fa icon={faXmark} />
-      </button>
+    <div class="relative z-[1] px-3 pb-3">
+      <ErrorBox message={pullError} lines={3} ondismiss={dismissError} />
     </div>
   {/if}
 </div>

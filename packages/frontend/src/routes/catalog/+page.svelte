@@ -20,7 +20,7 @@ import Select from '$lib/selects/Select.svelte';
 import ContainerProviderConnectionSelect from '$lib/selects/ContainerProviderConnectionSelect.svelte';
 import { selectedConnection } from '/@/states/connection.svelte';
 import { providerConnectionsInfo } from '/@/stores/connections';
-import { catalogHref, updateQuery } from '/@/utils/search-params';
+import { catalogHref, hasFilters, updateQuery } from '/@/utils/search-params';
 import type { PageProps } from './$types';
 
 let { data }: PageProps = $props();
@@ -76,11 +76,17 @@ const FILTERS: Array<{ field: FacetField; label: string; width: string }> = [
  * Facet values (and counts) of the latest search: the filters stay usable while a new search runs.
  */
 let facets: SearchResult['facets'] | undefined = $state.raw(undefined);
+/**
+ * Repositories found by the latest search, shown next to the sort (kept while a new search runs).
+ */
+let total: number | undefined = $state(undefined);
 $effect(() => {
   const promise = data.result;
   promise
     .then(result => {
-      if (promise === data.result) facets = result.facets;
+      if (promise !== data.result) return;
+      facets = result.facets;
+      total = result.total;
     })
     .catch(() => {
       // the error is shown by the results boundary
@@ -158,7 +164,21 @@ async function retry(reset: () => void): Promise<void> {
               if (item) navigate(updateQuery(query, { scope: item.value })).catch(console.error);
             }} />
         </div>
-        <div class="w-44 ml-auto">
+      </div>
+
+      <!-- the count and the sort of the results, on one line -->
+      <div class="flex flex-row items-center gap-x-3 px-5 pb-2 text-sm text-(--pd-content-text)" aria-label="Results">
+        <span aria-live="polite">
+          {#if total !== undefined}{total.toLocaleString()} {total === 1 ? 'repository' : 'repositories'}{/if}
+        </span>
+        {#if hasFilters(query)}
+          <Button
+            type="link"
+            aria-label="Clear filters"
+            onclick={(): Promise<void> => navigate(updateQuery(query, { filters: {} }))}>Clear filters</Button>
+        {/if}
+        <div class="ml-auto"></div>
+        <div class="w-44">
           <Select
             label="Sort by"
             name="sort"
@@ -173,12 +193,7 @@ async function retry(reset: () => void): Promise<void> {
       </div>
 
       <svelte:boundary>
-        <SearchResults
-          query={query}
-          result={data.result}
-          connection={connection}
-          onclear={(): Promise<void> => navigate(updateQuery(query, { filters: {} }))}
-          onpage={onpage} />
+        <SearchResults query={query} result={data.result} connection={connection} onpage={onpage} />
 
         {#snippet pending()}
           <SearchSkeleton />

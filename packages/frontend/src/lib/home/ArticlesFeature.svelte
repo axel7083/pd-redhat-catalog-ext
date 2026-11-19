@@ -42,16 +42,16 @@ function open(article: Article): void {
       </div>
     {/if}
     <div class="relative flex flex-col justify-between gap-y-5 grow min-w-0 self-stretch">
-      <div class="flex flex-col gap-y-3">
+      <div class="flex flex-col gap-y-2">
         <span class="text-xs font-semibold uppercase tracking-wider text-[var(--pd-content-text)] opacity-70">
           {lead.kicker}
         </span>
         <button
           type="button"
-          class="text-left text-2xl font-semibold leading-8 text-[var(--pd-content-header)] cursor-pointer hover:underline"
+          class="text-left text-lg font-semibold leading-snug text-[var(--pd-content-header)] cursor-pointer hover:underline"
           title={lead.url}
           onclick={(): void => open(lead)}>{lead.title}</button>
-        <p class="m-0 max-w-2xl text-base leading-7 text-[var(--pd-content-text)]">{lead.summary}</p>
+        <p class="m-0 max-w-2xl text-sm leading-normal text-[var(--pd-content-text)]">{lead.summary}</p>
       </div>
       <div class="flex flex-row flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         {#if leadCollection?.query}

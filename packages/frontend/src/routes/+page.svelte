@@ -8,9 +8,11 @@ let homeScroll = 0;
 <script lang="ts">
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 import type { SearchResult } from '@podman-desktop/extension-redhat-catalog-core-api';
-import { Button, NavPage, SearchInput } from '@podman-desktop/ui-svelte';
+import { Button, SearchInput } from '@podman-desktop/ui-svelte';
 
 import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
+// inlined (data URL), like the other webview images
+import redHatLogo from '$lib/home/assets/redhat-hat.webp?inline';
 import FrontPage from '$lib/home/FrontPage.svelte';
 import { catalogHref } from '/@/utils/search-params';
 import type { PageProps } from './$types';
@@ -59,16 +61,19 @@ afterNavigate(({ type }) => {
 });
 </script>
 
-<NavPage title="Red Hat Catalog" searchEnabled={false}>
-  {#snippet content()}
-    <div bind:this={scroller} class="flex flex-col w-full h-full min-h-0 overflow-y-auto">
-      <form class="flex flex-row items-center gap-3 px-5 pt-4 pb-6" role="search" onsubmit={onsubmit}>
-        <SearchInput class="grow" title="Red Hat Ecosystem Catalog" bind:searchTerm={text} />
-        <Button icon={faArrowRight} aria-label="Search the catalog" onclick={search}>
-          {text.trim() ? 'Search' : 'Browse the catalog'}
-        </Button>
-      </form>
-      <FrontPage catalog={catalog} />
-    </div>
-  {/snippet}
-</NavPage>
+<!-- the NavPage layout of Podman Desktop, with the Red Hat logo before the title -->
+<div class="flex flex-col w-full h-full pt-4 bg-[var(--pd-content-bg)]" role="region" aria-label="Red Hat Catalog">
+  <div class="flex flex-row items-center gap-x-3 px-5 pb-2" role="region" aria-label="header">
+    <img src={redHatLogo} alt="Red Hat" class="h-7 w-auto" />
+    <h1 class="m-0 text-xl font-bold text-[var(--pd-content-header)]">Red Hat Catalog</h1>
+  </div>
+  <div bind:this={scroller} class="flex flex-col w-full h-full min-h-0 overflow-y-auto">
+    <form class="flex flex-row items-center gap-3 px-5 pt-4 pb-6" role="search" onsubmit={onsubmit}>
+      <SearchInput class="grow" title="Red Hat Ecosystem Catalog" bind:searchTerm={text} />
+      <Button icon={faArrowRight} aria-label="Search the catalog" onclick={search}>
+        {text.trim() ? 'Search' : 'Browse the catalog'}
+      </Button>
+    </form>
+    <FrontPage catalog={catalog} />
+  </div>
+</div>

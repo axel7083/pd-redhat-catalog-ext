@@ -5,21 +5,19 @@ import type {
   SearchQuery,
   SearchResult,
 } from '@podman-desktop/extension-redhat-catalog-core-api';
-import { Button, EmptyScreen, LinearProgress } from '@podman-desktop/ui-svelte';
+import { EmptyScreen, LinearProgress } from '@podman-desktop/ui-svelte';
 
 import RepositoryCard from '$lib/cards/RepositoryCard.svelte';
 import Pagination from '$lib/explore/Pagination.svelte';
-import { hasFilters } from '/@/utils/search-params';
 
 interface Props {
   query: SearchQuery;
   result: Promise<SearchResult>;
   connection: ProviderContainerConnectionDetailedInfo | undefined;
-  onclear: () => void;
   onpage: (page: number) => void;
 }
 
-let { query, result, connection, onclear, onpage }: Props = $props();
+let { query, result, connection, onpage }: Props = $props();
 
 /**
  * Async Svelte: the first render shows the boundary pending snippet (skeleton); on a new search the current
@@ -29,16 +27,6 @@ let current = $derived(await result);
 </script>
 
 <div class="flex flex-col w-full">
-  <div class="flex flex-row items-center gap-x-3 px-5 pb-2 text-sm text-(--pd-content-text)" aria-label="Results">
-    <span aria-live="polite">
-      {current.total.toLocaleString()}
-      {current.total === 1 ? 'repository' : 'repositories'}
-    </span>
-    {#if hasFilters(query)}
-      <Button type="link" aria-label="Clear filters" onclick={onclear}>Clear filters</Button>
-    {/if}
-  </div>
-
   <div class="h-0.5">
     {#if $effect.pending()}<LinearProgress />{/if}
   </div>

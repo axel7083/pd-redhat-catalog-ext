@@ -108,11 +108,13 @@ test.each([
   expect(buildHydraSearchParams({ scope }).getAll('fq').slice(4)).toEqual(expected);
 });
 
-test.each([
-  { name: 'search text', query: { text: 'nginx' } },
-  { name: 'another sort', query: { sort: 'title-asc' as const } },
-])('no default boost with $name', ({ query }) => {
-  expect(buildHydraSearchParams(query).getAll('bq')).toEqual([]);
+test('no boost with another sort', () => {
+  expect(buildHydraSearchParams({ sort: 'title-asc' }).getAll('bq')).toEqual([]);
+  expect(buildHydraSearchParams({ text: 'nginx', sort: 'title-asc' }).getAll('bq')).toEqual([]);
+});
+
+test('a text search by relevance puts the Hardened images first among the matches', () => {
+  expect(buildHydraSearchParams({ text: 'nginx' }).getAll('bq')).toEqual(['build_categories_list:Hardened^30']);
 });
 
 test('the landing of another scope ranks recent runnable images with a logo first', () => {

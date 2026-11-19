@@ -44,8 +44,7 @@ function prefetch(): void {
   onmouseenter={prefetch}
   onfocus={prefetch}
   class="group flex flex-col gap-y-3 h-full min-w-0 rounded-lg border border-[var(--pd-content-bg)] bg-[var(--pd-content-card-bg)] p-4 no-underline hover:border-[var(--pd-content-card-border-selected)]"
-  aria-label={repository.title}
-  title="{repository.registry}/{repository.repository}">
+  aria-label={repository.title}>
   <div class="flex flex-row items-start justify-between gap-x-2 min-w-0">
     <RepositoryLogo url={repository.logoUrl} name={repository.publisher ?? repository.repository} wide />
     {#if hardened}<HardenedBadge />{/if}
